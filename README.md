@@ -6,7 +6,7 @@
 *A curated collection of 20 neon retro mini-games in vanilla JS and HTML5 Canvas.*
 
 
-[🌐 Запустить онлайн / Play Live (arcada.cfd)](https://arcada.cfd) • [🇷🇺 Русский раздел](#-русская-версия) • [🇬🇧 English Section](#-english-version)
+[🌐 Запустить онлайн / Play Live (arcada.cfd)](https://arcada.cfd)
 
 </div>
 
