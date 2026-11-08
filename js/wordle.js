@@ -37,7 +37,7 @@ async function wordle() {
   }
   const secret = freshWord(len), TRIES = 6, CELL = 54, GAP = 6;
   const grid = Array.from({ length: TRIES }, () => Array(len).fill('')), marks = Array(TRIES).fill(null), status = {};
-  const S = { row: 0, col: 0, msg: '', until: 0, shakeUntil: 0 };
+  const S = { row: 0, col: 0, msg: '', until: 0, shakeUntil: 0, revealTime: 0 };
   const gx = (W - (len * CELL + (len - 1) * GAP)) / 2, gy = 58;
   const toast = (m, t) => { S.msg = m; S.until = t + 1700; };
   function check(guess) {
@@ -52,10 +52,22 @@ async function wordle() {
     for (let r = 0; r < TRIES; r++) {
       const sh = (r === S.row && t < S.shakeUntil) ? Math.sin(t / 22) * 6 : 0;
       for (let c = 0; c < len; c++) {
-        const x = gx + c * (CELL + GAP) + sh, y = gy + r * (CELL + GAP), m = marks[r] && marks[r][c], ch = grid[r][c];
-        if (m) panel(x, y, CELL, CELL, { fill: css(WC[m]), stroke: null, r: 8 });
-        else panel(x, y, CELL, CELL, { fill: 'rgba(255,255,255,.05)', stroke: ch ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.16)', r: 8, lw: 2 });
-        if (ch) text(ch.toUpperCase(), x + CELL / 2, y + CELL / 2 + 1, { size: 30, bold: true });
+        const x = gx + c * (CELL + GAP) + sh, y = gy + r * (CELL + GAP);
+        let m = marks[r] && marks[r][c], ch = grid[r][c], flip = 1;
+        if (m && r === S.row - 1 && S.revealTime) {
+            let elapsed = t - S.revealTime - c * 150;
+            if (elapsed < 0) m = null;
+            else if (elapsed < 300) {
+                let prog = elapsed / 300;
+                flip = Math.abs(Math.cos(prog * Math.PI));
+                if (prog < 0.5) m = null;
+            }
+        }
+        g.save(); g.translate(x + CELL / 2, y + CELL / 2); g.scale(1, flip);
+        if (m) panel(-CELL / 2, -CELL / 2, CELL, CELL, { fill: css(WC[m]), stroke: null, r: 8 });
+        else panel(-CELL / 2, -CELL / 2, CELL, CELL, { fill: 'rgba(255,255,255,.05)', stroke: ch ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.16)', r: 8, lw: 2 });
+        if (ch) text(ch.toUpperCase(), 0, 1, { size: 30, bold: true });
+        g.restore();
       }
     }
     const ky = 440;
@@ -77,9 +89,9 @@ async function wordle() {
         if (!VOCAB[len].has(guess) && !NET[len].has(guess)) { toast('Нет такого слова', t); S.shakeUntil = t + 400; sfx('bad'); continue; }
         const res = check(guess); marks[S.row] = res;
         res.forEach((m, i) => { const ch = guess[i], o = status[ch]; if (!o || (o === 'gray') || (o === 'yellow' && m === 'green')) status[ch] = m; });
-        sfx('hit'); const won = guess === secret; S.row++; S.col = 0;
+        sfx('hit'); S.revealTime = t; const won = guess === secret; S.row++; S.col = 0;
         if (won || S.row === TRIES) {
-          await finishAnim(draw, 30);
+          await finishAnim(draw, 100);
           const r = await endScreen(won ? 'Угадано!' : 'Не угадал', won ? [`Слово: ${secret.toUpperCase()}`, `Попыток: ${S.row} из ${TRIES}`] : [`Слово было: ${secret.toUpperCase()}`], won ? GREEN : RED);
           return r === 'again' ? wordle() : undefined;
         }

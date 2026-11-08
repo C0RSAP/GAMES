@@ -3,7 +3,7 @@ async function memoryMatch() {
     FX.reset();
     const icons = ['👽','🚀','🍕','💎','💣','🍄','🎸','🕹️','🔮','🤖'];
     let deck = [...icons, ...icons].sort(() => Math.random() - 0.5);
-    let cards = deck.map((icon, i) => ({ x: W/2 - 330 + (i%5)*135, y: H/2 - 230 + (i/5|0)*125, icon, flipped: false, matched: false, flipA: 0 }));
+    let cards = deck.map((icon, i) => ({ x: W/2 - 320 + (i%5)*135, y: H/2 - 190 + (i/5|0)*125, icon, flipped: false, matched: false, flipA: 0 }));
     let flipped = [], moves = 0, matches = 0, wait = 0;
     
     const drawBg = (t) => {
@@ -66,7 +66,7 @@ async function memoryMatch() {
                 let hov = inRect(mouse, [card.x, card.y, 100, 110]) && !wait;
                 let yOff = hov ? -5 : 0;
                 panel(-50, -55 + yOff, 100, 110, { fill: 'rgba(255,255,255,0.08)', r: 12, stroke: 'rgba(255,255,255,0.3)', lw: 2 });
-                text('❓', 0, 5 + yOff, { size: 40, color: MUTED });
+                text('?', 0, 5 + yOff, { size: 60, bold: true, color: MUTED });
             }
             g.restore();
         }

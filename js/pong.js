@@ -17,7 +17,17 @@ async function pongMatch() {
     B.trail.forEach(([x, y], i) => disc(x, y, 2 + 7 * (i + 1) / B.trail.length, dark([200, 210, 255], (i + 1) / B.trail.length * .45)));
     glow(B.x, B.y, 40, [110, 116, 170]); disc(B.x, B.y, 9, WHITE);
     if (t < serveAt) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.arc(B.x, B.y, 16 + 8 * Math.sin(t / 90), 0, 6.283); g.stroke(); }
-    for (const p of P) { glow(p.x + PW / 2, p.y + p.h / 2, 70, dark(p.color, .5)); g.fillStyle = css(p.color); g.fillRect(p.x, p.y, PW, p.h); g.strokeStyle = css(light(p.color, 70)); g.lineWidth = 2; g.strokeRect(p.x, p.y, PW, p.h); }
+    for (const p of P) { 
+        glow(p.x + PW / 2, p.y + p.h / 2, 70, dark(p.color, .5)); 
+        let sw = PW, sh = p.h, ox = 0, oy = 0;
+        if (p.hitT && t - p.hitT < 200) {
+            let sq = Math.sin((t - p.hitT)/200 * Math.PI);
+            sw = PW * (1 - sq * 0.4); sh = p.h * (1 + sq * 0.2);
+            ox = (PW - sw)/2; oy = (p.h - sh)/2;
+        }
+        g.fillStyle = css(p.color); g.fillRect(p.x + ox, p.y - oy, sw, sh); 
+        g.strokeStyle = css(light(p.color, 70)); g.lineWidth = 2; g.strokeRect(p.x + ox, p.y - oy, sw, sh); 
+    }
     if (orb) { glow(orb.x + 15, orb.y + 15, 44, [150, 120, 20]); disc(orb.x + 15, orb.y + 15, 15, GOLD); text('?', orb.x + 15, orb.y + 15, { size: 20, bold: true, color: [80, 46, 0] }); }
     if (t < msg[1]) pill(msg[0], H - 40);
   }
@@ -38,6 +48,7 @@ async function pongMatch() {
           const off = Math.max(-1, Math.min(1, (B.y - (p.y + p.h / 2)) / (p.h / 2 + 9))), sp = Math.min(Math.hypot(B.vx, B.vy) * 1.06, 16), vy = off * sp * .75;
           B.vx = Math.sqrt(Math.max(sp * sp - vy * vy, 1)) * (i === 0 ? 1 : -1); B.vy = vy; B.x = i === 0 ? p.x + PW + 10 : p.x - 10; B.last = i;
           burst(B.x, B.y, p.color, 12, 5); FX.shake = Math.max(FX.shake, 3); sfx('hit');
+          p.hitT = t;
         }
       });
       if (!orb && Math.random() < .004) orb = { x: rnd(W / 2 - 250, W / 2 + 220), y: rnd(80, H - 110) };

@@ -78,6 +78,7 @@ async function raceMatch() {
     }
     
     // Игрок (Стильный Cyberpunk болид)
+    g.save(); g.translate(P.x + P.w/2, P.y + P.h/2); g.rotate(P.vx * 0.04); g.translate(-(P.x + P.w/2), -(P.y + P.h/2));
     glow(P.x + P.w/2, P.y + P.h/2, 50, [0, 255, 255]);
     panel(P.x, P.y, P.w, P.h, { fill: 'rgba(0, 30, 40, 0.95)', r: 14, stroke: 'rgb(0, 255, 255)', lw: 2 });
     
@@ -93,6 +94,7 @@ async function raceMatch() {
     glow(P.x + 8, P.y - 15, 35, [255, 255, 255]); glow(P.x + P.w - 8, P.y - 15, 35, [255, 255, 255]);
     g.fillStyle = '#fff';
     g.fillRect(P.x + 4, P.y + 2, 8, 6); g.fillRect(P.x + P.w - 12, P.y + 2, 8, 6);
+    g.restore();
     
     frames++;
     updateFx(); drawFx();

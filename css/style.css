@@ -1,3 +1,21 @@
 html,body{margin:0;height:100%;background:#080914;overflow:hidden}
 body{display:flex;align-items:center;justify-content:center}
 canvas{display:block;touch-action:none}
+
+/* === MODERN CLEAN AESTHETIC === */
+body {
+    /* Глубокий темный фон с легким градиентом сверху */
+    background: radial-gradient(circle at 50% -20%, #1e1e2e, #0d0d1a, #05050a);
+}
+
+canvas {
+    /* Скругленные углы и многослойная тень для объема */
+    border-radius: 16px;
+    box-shadow: 
+        0 30px 60px rgba(0,0,0,0.8),
+        0 0 0 1px rgba(255,255,255,0.08),
+        0 0 40px rgba(0, 255, 255, 0.03),
+        0 0 40px rgba(255, 0, 255, 0.03);
+    /* Чуть больше контраста для сочности, без мыла */
+    filter: contrast(1.05) saturate(1.1);
+}

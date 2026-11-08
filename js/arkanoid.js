@@ -14,7 +14,13 @@ async function arkanoidMatch() {
     
     const drawBg = (t) => {
         backdrop(t, [10, 20, 40], [20, 40, 80]);
-        panel(P.x, P.y, P.w, P.h, { fill: css(WHITE), r: 8 });
+        let pw = P.w, ph = P.h, px = P.x, py = P.y;
+        if (P.hitT && t - P.hitT < 200) {
+            let sq = Math.sin((t - P.hitT)/200 * Math.PI);
+            pw = P.w * (1 + sq * 0.1); ph = P.h * (1 - sq * 0.4);
+            px = P.x - (pw - P.w)/2; py = P.y - (ph - P.h)/2;
+        }
+        panel(px, py, pw, ph, { fill: css(WHITE), r: 8 });
         for (let br of bricks) {
             if (br.active) panel(br.x, br.y, br.w, br.h, { fill: css(br.color), r: 4 });
         }
@@ -52,6 +58,7 @@ async function arkanoidMatch() {
                 B.vx = ((B.x - (P.x + P.w/2)) / (P.w/2)) * 8; 
                 B.y = P.y - B.r;
                 sfx('hit');
+                P.hitT = t;
             }
             
             let activeBricks = 0;

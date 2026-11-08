@@ -150,7 +150,13 @@ async function tetrisMatch() {
         let ghostY = piece.y;
         while(!collide(board, piece, 0, ghostY - piece.y + 1)) ghostY++;
         for(let r=0; r<piece.m.length; r++) for(let c=0; c<piece.m[r].length; c++) {
-            if (piece.m[r][c]) panel(ox + (piece.x + c)*cs, oy + (ghostY + r)*cs, cs, cs, { fill: css(piece.c, 0.2), r: 4, stroke: css(piece.c, 0.5) });
+            if (piece.m[r][c]) {
+                let px = ox + (piece.x + c)*cs, py = oy + (ghostY + r)*cs, srcY = oy + (piece.y + r)*cs;
+                let grad = g.createLinearGradient(0, srcY + cs, 0, py);
+                grad.addColorStop(0, css(piece.c, 0.15)); grad.addColorStop(1, css(piece.c, 0.0));
+                g.fillStyle = grad; g.fillRect(px + 4, srcY + cs, cs - 8, py - srcY - cs);
+                panel(px, py, cs, cs, { fill: css(piece.c, 0.2), r: 4, stroke: css(piece.c, 0.5) });
+            }
         }
         for(let r=0; r<piece.m.length; r++) for(let c=0; c<piece.m[r].length; c++) {
             if (piece.m[r][c]) {
