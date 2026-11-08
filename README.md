@@ -7,10 +7,6 @@
 
 <h3>👉 <a href="https://arcada.cfd">ЗАПУСТИТЬ АРКАДУ ОНЛАЙН (ARCADA.CFD)</a> 👈</h3>
 
-![Status](https://shields.io)
-![Games](https://shields.io)
-![Tech](https://shields.io)
-
 </div>
 
 ---
@@ -76,7 +72,7 @@
 
 1. Склонируйте репозиторий или скачайте архив:
    ```bash
-   git clone https://github.com
+   git clone https://github.com/C0RSAP/GAMES
    ```
 2. Откройте файл **`index.html`** в любом современном браузере (Chrome, Edge, Firefox, Safari).
 
