@@ -5,10 +5,6 @@
 **Сборник из 20 ретро и неоновых аркадных игр на чистом JS и Canvas.**  
 *A curated collection of 20 neon retro mini-games in vanilla JS and HTML5 Canvas.*
 
-[![JavaScript](https://shields.io)](#)
-[![HTML5 Canvas](https://shields.io)](#)
-[![Multiplayer](https://shields.io)](#)
-[![Status](https://shields.io)](#)
 
 [🌐 Запустить онлайн / Play Live (arcada.cfd)](https://arcada.cfd) • [🇷🇺 Русский раздел](#-русская-версия) • [🇬🇧 English Section](#-english-version)
 
