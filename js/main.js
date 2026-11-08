@@ -10,11 +10,11 @@ const GAMES = [
   { n: 'Виселица', d: '1 или 2 игрока', c: [170, 140, 255], run: hangmanLoop },
   { n: 'Wordle', d: '5 или 6 букв', c: [110, 232, 190], run: wordle },
 ];
-const rect = i => [50 + (i % 4) * 220, 170 + (i / 4 | 0) * 190, 200, 170];
+const rect = i => [(W - 960) / 2 + 50 + (i % 4) * 220, 170 + (i / 4 | 0) * 190, 200, 170];
 async function menu() {
   let sel = 0;
   for (;;) {
-    const t = now(), { keys, clicks } = pump();
+    applySize(); const t = now(), { keys, clicks } = pump();
     for (const e of keys) {
       const d = e.code.match(/^(?:Digit|Numpad)([1-8])$/);
       if (d && GAMES[d[1] - 1].run) return GAMES[d[1] - 1];
@@ -35,7 +35,7 @@ async function menu() {
       text(String(i + 1), x + w / 2, y + 62, { size: 26, bold: true, color: [14, 16, 30] });
       text(gm.n, x + w / 2, y + 118, { size: 26, bold: true, color: off ? FAINT : INK }); text(gm.d, x + w / 2, y + 146, { size: 15, color: off ? FAINT : MUTED });
     });
-    hints([['1-8', 'выбрать'], ['← ↑ → ↓', 'навигация'], ['Enter', 'играть'], ['M', STATE.mute ? 'включить звук' : 'выключить звук']]);
+    hints([['1-8', 'выбрать'], ['← ↑ → ↓', 'навигация'], ['Enter', 'играть'], ['M', STATE.mute ? 'включить звук' : 'выключить звук'], ['F11', 'во весь экран']]);
     await present();
   }
 }

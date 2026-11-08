@@ -1,9 +1,24 @@
 'use strict';
 // ===== Движок: холст 960x640, ввод по физическим клавишам, звук, эффекты =====
-const W = 960, H = 640, cv = document.getElementById('game');
-const dpr = Math.min(3, Math.max(2, window.devicePixelRatio || 1)); // чёткая картинка: минимум 2x, на ретине до 3x
-cv.width = W * dpr; cv.height = H * dpr;
-const g = cv.getContext('2d'); g.scale(dpr, dpr); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+let W = 960; const H = 640, cv = document.getElementById('game'); // ширина подстраивается под экран, высота логическая 640
+// Игра занимает весь экран: логическая ширина W подстраивается под пропорции окна (высота 640),
+// буфер холста — под реальный размер на экране × плотность пикселей, поэтому картинка остаётся чёткой.
+const g = cv.getContext('2d');
+function fit() {
+  const s = Math.min(innerWidth / W, innerHeight / H), cw = W * s, ch = H * s;
+  cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+  const k = Math.min(4096 / W, Math.max(1, cw * (window.devicePixelRatio || 1) / W));
+  cv.width = Math.round(W * k); cv.height = Math.round(H * k);
+  g.setTransform(k, 0, 0, k, 0, 0); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+}
+// Меняем W только в безопасные моменты (меню, начало игры/раунда), чтобы не сломать поле посреди партии
+function applySize() {
+  const asp = Math.max(1.5, Math.min(2.4, innerWidth / innerHeight)), Wn = asp > 1.5 ? Math.round(H * asp) : 960;
+  if (Wn !== W) { W = Wn; fit(); }
+}
+applySize(); fit(); addEventListener('resize', fit); document.addEventListener('fullscreenchange', fit);
+const toggleFull = () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (_) { } };
+cv.addEventListener('dblclick', toggleFull);
 const FF = '"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif';
 const INK = [236, 239, 252], MUTED = [142, 150, 180], FAINT = [84, 92, 124], GOLD = [255, 208, 84],
   GREEN = [46, 204, 132], YELLOW = [245, 184, 65], GRAY = [62, 66, 92], RED = [255, 96, 110], WHITE = [255, 255, 255];
@@ -22,7 +37,8 @@ const now = () => performance.now();
 const held = new Set(), keyQ = [], clickQ = [], mouse = { x: -1, y: -1 };
 const pos = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
 addEventListener('keydown', e => {
-  if (e.code === 'F11' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === 'F11') { e.preventDefault(); toggleFull(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.code.startsWith('Arrow') || e.code === 'Space' || e.code === 'Backspace') e.preventDefault();
   if (!e.repeat) { held.add(e.code); keyQ.push(e); }
 });
@@ -57,7 +73,7 @@ const SND = { shoot: [700, 100, .16, 'square', -4000], coin: [880, 80, .18, 'squ
 const sfx = n => tone(...SND[n]);
 
 // ----- эффекты -----
-const FX = { p: [], f: [], shake: 0, reset() { this.p.length = 0; this.f.length = 0; this.shake = 0; } };
+const FX = { p: [], f: [], shake: 0, reset() { applySize(); this.p.length = 0; this.f.length = 0; this.shake = 0; } };
 function burst(x, y, c, n = 14, speed = 4, life = 40, size = 4) {
   for (let i = 0; i < n; i++) { const a = rnd(0, 6.283), s = rnd(.3, 1) * speed; FX.p.push([x, y, Math.cos(a) * s, Math.sin(a) * s, life, life, c, size]); }
 }

@@ -2,7 +2,7 @@
 // ===== 1. Змейка (2 игрока: WASD и стрелки) =====
 async function snakeRound(wins) {
   FX.reset();
-  const CELL = 20, OY = 60, COLS = W / CELL | 0, ROWS = (H - OY) / CELL | 0, mid = ROWS >> 1;
+  const CELL = 20, OY = 60, COLS = W / CELL | 0, OX = (W - COLS * CELL) / 2, ROWS = (H - OY) / CELL | 0, mid = ROWS >> 1;
   const P = [
     { name: PN[0], color: PC[0], body: [[6, mid], [5, mid], [4, mid]], dir: [1, 0], keys: { KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] } },
     { name: PN[1], color: PC[1], body: [[COLS - 7, mid], [COLS - 6, mid], [COLS - 5, mid]], dir: [-1, 0], keys: { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] } }];
@@ -12,7 +12,7 @@ async function snakeRound(wins) {
   const dots = document.createElement('canvas'); dots.width = W; dots.height = H - OY;
   const dg = dots.getContext('2d'); dg.fillStyle = 'rgba(255,255,255,.07)';
   for (let x = 0; x < COLS; x++) for (let y = 0; y < ROWS; y++) { dg.beginPath(); dg.arc(x * CELL + 10, y * CELL + 10, 1, 0, 6.283); dg.fill(); }
-  const cpos = c => [c[0] * CELL + CELL / 2, OY + c[1] * CELL + CELL / 2];
+  const cpos = c => [OX + c[0] * CELL + CELL / 2, OY + c[1] * CELL + CELL / 2];
   function addItem(kind) {
     for (let i = 0; i < 500; i++) {
       const c = [Math.random() * COLS | 0, Math.random() * ROWS | 0];
@@ -33,7 +33,7 @@ async function snakeRound(wins) {
     for (const s of [-1, 1]) { const ex = hx + dx * 3 - dy * 4 * s, ey = hy + dy * 3 + dx * 4 * s; disc(ex, ey, 3, WHITE); disc(ex + dx, ey + dy, 1, [10, 10, 20]); }
   }
   function drawScene(t) {
-    backdrop(t, [44, 36, 104], [12, 60, 96]); g.drawImage(dots, 0, OY);
+    backdrop(t, [44, 36, 104], [12, 60, 96]); g.drawImage(dots, OX, OY);
     const pulse = Math.sin(t / 200);
     for (const [k, kind] of items) {
       const [x, y] = cpos(k.split(',').map(Number));

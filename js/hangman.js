@@ -16,7 +16,7 @@ function drawKeyboard(top, status, kw = 40, kh = 42, gap = 5) { // возвра�
   return rects;
 }
 async function hangman() {
-  FX.reset(); let mode = null; const BG = [[70, 44, 130], [20, 50, 100]], VIO = [200, 170, 255];
+  FX.reset(); const OX = (W - 960) / 2; let mode = null; const BG = [[70, 44, 130], [20, 50, 100]], VIO = [200, 170, 255];
   const cards = [[1, [W / 2 - 400, 220, 380, 190], 'Компьютер загадывает', 'Играй один против словаря', [120, 230, 170]], [2, [W / 2 + 20, 220, 380, 190], 'Два игрока', 'Один загадывает, другой отгадывает', [130, 180, 255]]];
   while (!mode) {
     const { keys, clicks } = pump();
@@ -54,12 +54,12 @@ async function hangman() {
       hints([['Пробел', 'начать']], 400); await present();
     }
   } else word = pick(pick([SECRET[5], SECRET[6]]));
-  const LETTERS = 'абвгдежзийклмнопрстуфхцчшщъыьэюя', MAX = 7, guessed = new Set(), S = { wrong: 0, state: 'play' }, PX = 40, PY = 70;
+  const LETTERS = 'абвгдежзийклмнопрстуфхцчшщъыьэюя', MAX = 7, guessed = new Set(), S = { wrong: 0, state: 'play' }, PX = 40 + OX, PY = 70;
   let kb = {};
   const guess = ch => {
     if (S.state !== 'play' || guessed.has(ch) || !LETTERS.includes(ch)) return; guessed.add(ch);
     if (!word.includes(ch)) { S.wrong++; sfx('bad'); FX.shake = 6; if (S.wrong >= MAX) { S.state = 'lose'; sfx('boom'); } }
-    else { sfx('coin'); if ([...word].every(c => guessed.has(c))) { S.state = 'win'; sfx('bonus'); burst(685, 170, GOLD, 40, 6); } }
+    else { sfx('coin'); if ([...word].every(c => guessed.has(c))) { S.state = 'win'; sfx('bonus'); burst((685 + OX), 170, GOLD, 40, 6); } }
   };
   function gallows(w) {
     const wood = [186, 146, 104], body = [238, 208, 176], p = (x, y) => [PX + x, PY + y];
@@ -74,19 +74,19 @@ async function hangman() {
     for (const e of keys) { if (is(e, 'Escape')) return 'menu'; if (S.state !== 'play') { if (is(e, 'KeyR', 'Enter', 'NumpadEnter')) return 'again'; continue; } const ch = ruLetter(e); if (ch) guess(ch); }
     for (const c of clicks) if (S.state === 'play') for (const [ch, r] of Object.entries(kb)) if (inRect(c, r)) guess(ch);
     backdrop(t, ...BG); panel(PX, PY, 380, 404, { fill: 'rgba(255,255,255,.05)', stroke: 'rgba(255,255,255,.16)', r: 26 }); gallows(S.wrong);
-    text(mode === 1 ? 'против компьютера' : 'два игрока', 685, 92, { size: 15, color: MUTED });
-    const n = word.length, sw = Math.min(56, (470 - 8 * (n - 1)) / n), x0 = 450 + (470 - (n * sw + 8 * (n - 1))) / 2;
+    text(mode === 1 ? 'против компьютера' : 'два игрока', (685 + OX), 92, { size: 15, color: MUTED });
+    const n = word.length, sw = Math.min(56, (470 - 8 * (n - 1)) / n), x0 = OX + 450 + (470 - (n * sw + 8 * (n - 1))) / 2;
     [...word].forEach((c, i) => {
       const x = x0 + i * (sw + 8), miss = S.state === 'lose' && !guessed.has(c);
       panel(x, 140, sw, sw + 12, { fill: 'rgba(255,255,255,.06)', stroke: css(VIO, .43), r: 12, lw: 2 });
       if (guessed.has(c) || S.state === 'lose') text(c.toUpperCase(), x + sw / 2, 140 + (sw + 12) / 2, { size: 38, bold: true, color: miss ? RED : INK });
     });
-    for (let i = 0; i < MAX; i++) disc(685 - (MAX - 1) * 14 + i * 28, 250, 7, i < S.wrong ? RED : [50, 54, 86]);
-    text(`Ошибки: ${S.wrong} / ${MAX}`, 685, 282, { color: MUTED });
+    for (let i = 0; i < MAX; i++) disc((685 + OX) - (MAX - 1) * 14 + i * 28, 250, 7, i < S.wrong ? RED : [50, 54, 86]);
+    text(`Ошибки: ${S.wrong} / ${MAX}`, (685 + OX), 282, { color: MUTED });
     const status = {}; for (const c of guessed) status[c] = word.includes(c) ? 'green' : 'red';
     kb = drawKeyboard(486, status, 36, 40, 5);
-    if (S.state === 'play') text('Жми буквы на клавиатуре или мышью', 685, 330, { size: 15, color: FAINT });
-    else { text(S.state === 'win' ? 'ПОБЕДА!' : 'ПРОИГРЫШ', 685, 350, { size: 62, bold: true, color: S.state === 'win' ? GREEN : RED, shadow: true }); hints([['R', 'ещё раз'], ['ESC', 'меню']], 400); }
+    if (S.state === 'play') text('Жми буквы на клавиатуре или мышью', (685 + OX), 330, { size: 15, color: FAINT });
+    else { text(S.state === 'win' ? 'ПОБЕДА!' : 'ПРОИГРЫШ', (685 + OX), 350, { size: 62, bold: true, color: S.state === 'win' ? GREEN : RED, shadow: true }); hints([['R', 'ещё раз'], ['ESC', 'меню']], 400); }
     updateFx(); drawFx(); await present();
   }
 }
