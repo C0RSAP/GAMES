@@ -1,10 +1,11 @@
 'use strict';
-// Словарь из интернета: подгружается при старте, кэшируется в браузере на 30 дней.
-// Если интернета нет — игра работает на встроенных списках words5.js / words6.js.
-const NET = { 5: new Set(), 6: new Set(), status: 'загрузка словаря из интернета…', ok: false };
+// Слова из интернета (открытые источники). Кэш в браузере на 30 дней; без сети игра работает на встроенных списках.
+//  - существительные (GitHub, Harrix/Russian-Nouns) -> ЗАГАДЫВАЕМЫЕ слова (NET.sec) и допустимые попытки
+//  - все слова русского языка (Hugging Face, MirrorAzure/russian-words) -> допустимые попытки (NET[5], NET[6])
+const NET = { 5: new Set(), 6: new Set(), sec: { 5: new Set(), 6: new Set() }, status: 'загрузка словаря из интернета…', ok: false };
 const NET_SOURCES = [
-  'https://huggingface.co/datasets/MirrorAzure/russian-words/resolve/main/words.txt',
-  'https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt',
+  { url: 'https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt', secret: true },
+  { url: 'https://huggingface.co/datasets/MirrorAzure/russian-words/resolve/main/words.txt', secret: false },
 ];
 function netParse(text) {
   const out = { 5: new Set(), 6: new Set() };
@@ -14,27 +15,30 @@ function netParse(text) {
   }
   return out;
 }
-function netApply(d) { for (const n of [5, 6]) for (const w of d[n]) NET[n].add(w); NET.ok = true; NET.status = `слов из интернета: ${NET[5].size + NET[6].size}`; }
+function netApply(v, s) {
+  for (const n of [5, 6]) { for (const w of v[n]) NET[n].add(w); for (const w of s[n]) { NET.sec[n].add(w); NET[n].add(w); } }
+  NET.ok = true; NET.status = `из интернета: ${NET.sec[5].size + NET.sec[6].size} загадываемых, ${NET[5].size + NET[6].size} допустимых слов`;
+}
 async function loadNetWords() {
-  const KEY = 'net_words_v1', DAY = 864e5;
+  const KEY = 'net_words_v2', DAY = 864e5;
   try {
     const c = JSON.parse(localStorage.getItem(KEY));
-    if (c && c[5] && c[6]) { netApply({ 5: c[5], 6: c[6] }); if (Date.now() - c.t < 30 * DAY) return; }
+    if (c && c.v5) { netApply({ 5: c.v5, 6: c.v6 }, { 5: c.s5, 6: c.s6 }); if (Date.now() - c.t < 30 * DAY) return; }
   } catch (_) { }
-  const merged = { 5: new Set(), 6: new Set() };
-  for (const url of NET_SOURCES) {
+  const v = { 5: new Set(), 6: new Set() }, s = { 5: new Set(), 6: new Set() };
+  for (const { url, secret } of NET_SOURCES) {
     try {
       const ac = new AbortController(), to = setTimeout(() => ac.abort(), 30000);
       const r = await fetch(url, { signal: ac.signal }); clearTimeout(to);
       if (!r.ok) continue;
       const d = netParse(await r.text());
       if (d[5].size < 500 && d[6].size < 500) continue; // файл подозрительно мал — пропускаем
-      for (const n of [5, 6]) for (const w of d[n]) merged[n].add(w);
+      for (const n of [5, 6]) for (const w of d[n]) (secret ? s : v)[n].add(w);
     } catch (_) { }
   }
-  if (merged[5].size || merged[6].size) {
-    netApply(merged);
-    try { localStorage.setItem(KEY, JSON.stringify({ t: Date.now(), 5: [...NET[5]], 6: [...NET[6]] })); } catch (_) { }
+  if (v[5].size || v[6].size || s[5].size || s[6].size) {
+    netApply(v, s);
+    try { localStorage.setItem(KEY, JSON.stringify({ t: Date.now(), v5: [...NET[5]], v6: [...NET[6]], s5: [...NET.sec[5]], s6: [...NET.sec[6]] })); } catch (_) { }
   } else if (!NET.ok) NET.status = 'интернет-словарь недоступен — играем на встроенном';
 }
 loadNetWords();

@@ -2,12 +2,14 @@
 // ===== 8. Wordle (5 или 6 букв, слова не повторяются — хранятся в localStorage) =====
 const BLOCKED = new Set(['оргазм', 'пиндос', 'параша', 'нацмен', 'похоть']);
 const SECRET = { 5: WORDS5.filter(w => !BLOCKED.has(w)), 6: WORDS6.filter(w => !BLOCKED.has(w)) };
+// загадываемые слова: встроенные + существительные, скачанные из интернета
+const secretPool = n => { const s = new Set(SECRET[n]); for (const w of NET.sec[n]) if (!BLOCKED.has(w)) s.add(w); return [...s]; };
 const VOCAB = { 5: new Set(WORDS5), 6: new Set(WORDS6) };
 const loadUsed = () => { try { const d = JSON.parse(localStorage.getItem('wordle_used')) || {}; return { 5: new Set(d[5] || []), 6: new Set(d[6] || []) }; } catch (_) { return { 5: new Set(), 6: new Set() }; } };
 const saveUsed = u => { try { localStorage.setItem('wordle_used', JSON.stringify({ 5: [...u[5]], 6: [...u[6]] })); } catch (_) { } };
 function freshWord(n) {
-  const u = loadUsed(); let pool = SECRET[n].filter(w => !u[n].has(w));
-  if (!pool.length) { u[n].clear(); pool = SECRET[n]; }
+  const u = loadUsed(); const all = secretPool(n); let pool = all.filter(w => !u[n].has(w));
+  if (!pool.length) { u[n].clear(); pool = all; }
   const w = pick(pool); u[n].add(w); saveUsed(u); return w;
 }
 const KB = ['йцукенгшщзхъ', 'фывапролджэ', 'ячсмитьбю'];
@@ -15,7 +17,7 @@ const WC = { green: GREEN, yellow: YELLOW, gray: GRAY };
 
 async function wordle() {
   FX.reset();
-  const u = loadUsed(), fresh = n => SECRET[n].filter(w => !u[n].has(w)).length, ACC = [110, 232, 190];
+  const u = loadUsed(), POOL = { 5: secretPool(5), 6: secretPool(6) }, fresh = n => POOL[n].filter(w => !u[n].has(w)).length, ACC = [110, 232, 190];
   const cards = [[5, [W / 2 - 250, 210, 230, 170]], [6, [W / 2 + 20, 210, 230, 170]]];
   let len = null;
   while (!len) {
@@ -29,7 +31,7 @@ async function wordle() {
       panel(r[0], y, r[2], r[3], { fill: `rgba(255,255,255,${hov ? .09 : .05})`, stroke: css(ACC, hov ? .82 : .31), r: 26, lw: 2 });
       text(String(n), r[0] + r[2] / 2, y + 72, { size: 112, bold: true }); text('букв', r[0] + r[2] / 2, y + 128, { size: 26, bold: true, color: MUTED });
     }
-    text(`Новых слов осталось: ${fresh(5)} из ${SECRET[5].length} (5 букв), ${fresh(6)} из ${SECRET[6].length} (6 букв)`, W / 2, 430, { size: 15, color: FAINT });
+    text(`Новых слов осталось: ${fresh(5)} из ${POOL[5].length} (5 букв), ${fresh(6)} из ${POOL[6].length} (6 букв)`, W / 2, 430, { size: 15, color: FAINT });
     text('Использованные слова запоминаются в браузере · ' + NET.status, W / 2, 456, { size: 15, color: FAINT });
     hints([['5 6', 'выбрать'], ['ESC', 'назад']]); await present();
   }

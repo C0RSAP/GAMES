@@ -53,7 +53,7 @@ async function hangman() {
       backdrop(now(), ...BG); text('Слово загадано!', W / 2, 240, { size: 62, bold: true, color: GOLD }); text('Передай клавиатуру отгадывающему', W / 2, 320, { size: 26, bold: true });
       hints([['Пробел', 'начать']], 400); await present();
     }
-  } else word = pick(pick([SECRET[5], SECRET[6]]));
+  } else word = pick(secretPool(pick([5, 6])));
   const LETTERS = 'абвгдежзийклмнопрстуфхцчшщъыьэюя', MAX = 7, guessed = new Set(), S = { wrong: 0, state: 'play' }, PX = 40 + OX, PY = 70;
   let kb = {};
   const guess = ch => {
