@@ -30,7 +30,7 @@ async function wordle() {
       text(String(n), r[0] + r[2] / 2, y + 72, { size: 112, bold: true }); text('букв', r[0] + r[2] / 2, y + 128, { size: 26, bold: true, color: MUTED });
     }
     text(`Новых слов осталось: ${fresh(5)} из ${SECRET[5].length} (5 букв), ${fresh(6)} из ${SECRET[6].length} (6 букв)`, W / 2, 430, { size: 15, color: FAINT });
-    text('Использованные слова запоминаются в браузере', W / 2, 456, { size: 15, color: FAINT });
+    text('Использованные слова запоминаются в браузере · ' + NET.status, W / 2, 456, { size: 15, color: FAINT });
     hints([['5 6', 'выбрать'], ['ESC', 'назад']]); await present();
   }
   const secret = freshWord(len), TRIES = 6, CELL = 54, GAP = 6;
@@ -72,7 +72,7 @@ async function wordle() {
       if (is(e, 'Enter', 'NumpadEnter')) {
         if (S.col < len) { toast('Не хватает букв', t); S.shakeUntil = t + 400; sfx('bad'); continue; }
         const guess = grid[S.row].join('');
-        if (!VOCAB[len].has(guess)) { toast('Нет такого слова', t); S.shakeUntil = t + 400; sfx('bad'); continue; }
+        if (!VOCAB[len].has(guess) && !NET[len].has(guess)) { toast('Нет такого слова', t); S.shakeUntil = t + 400; sfx('bad'); continue; }
         const res = check(guess); marks[S.row] = res;
         res.forEach((m, i) => { const ch = guess[i], o = status[ch]; if (!o || (o === 'gray') || (o === 'yellow' && m === 'green')) status[ch] = m; });
         sfx('hit'); const won = guess === secret; S.row++; S.col = 0;
