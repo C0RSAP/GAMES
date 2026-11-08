@@ -1,214 +1,64 @@
-/**
- * Сбор монет — 2–4 игрока
- * 1: WASD  2: стрелки  3: IJKL  4: numpad 8456
- */
-export function startCoins(root, onBack) {
-  root.innerHTML = `
-    <div class="game-wrap">
-      <div class="hud" id="scores"></div>
-      <canvas id="c" width="900" height="500"></canvas>
-      <div class="hint-bar">
-        <button id="btn2" class="btn-sm">2 игрока</button>
-        <button id="btn3" class="btn-sm">3 игрока</button>
-        <button id="btn4" class="btn-sm">4 игрока</button>
-        · ESC — меню
-      </div>
-    </div>`;
-
-  const canvas = root.querySelector('#c');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  const names = ['Зелёный', 'Синий', 'Оранжевый', 'Розовый'];
-  const colors = ['#4ade80', '#60a5fa', '#fb923c', '#f472b6'];
-  const controls = [
-    { up: 'w', down: 's', left: 'a', right: 'd' },
-    { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' },
-    { up: 'i', down: 'k', left: 'j', right: 'l' },
-    { up: '8', down: '5', left: '4', right: '6' },
-  ];
-
-  let n = 0, players = [], items = [], startTime = 0, running = false, animId = 0;
-  const DURATION = 45000;
-  const keys = {};
-
-  function start(count) {
-    n = count;
-    players = [];
-    const starts = [[80, 80], [W - 110, H - 110], [W - 110, 80], [80, H - 110]];
-    for (let i = 0; i < n; i++) {
-      players.push({ x: starts[i][0], y: starts[i][1], score: 0, boost: 0, stun: 0, i });
+'use strict';
+// ===== 2. Сбор монет (2–4 игрока) =====
+async function coinRush(n) {
+  FX.reset();
+  const ctrl = [['KeyW', 'KeyS', 'KeyA', 'KeyD'], ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'], ['KeyI', 'KeyK', 'KeyJ', 'KeyL'], ['Numpad8', 'Numpad5', 'Numpad4', 'Numpad6']];
+  const TOP = 60, R = 16, DUR = 45, st = [[110, 160], [W - 110, H - 100], [W - 110, 160], [110, H - 100]];
+  const P = Array.from({ length: n }, (_, i) => ({ i, x: st[i][0], y: st[i][1], score: 0, boost: 0, stun: 0 }));
+  let items = [], start = 0, lastSpawn = 0, rain = new Set(), msg = ['', 0];
+  const spawn = (kind, t) => {
+    if (!kind) { let r = Math.random() * 100; kind = r < 60 ? 'coin' : r < 70 ? 'gem' : r < 88 ? 'bomb' : 'potion'; }
+    items.push({ kind, x: rnd(30, W - 30), y: rnd(TOP + 30, H - 30), born: t });
+  };
+  function draw(t) {
+    const left = Math.max(0, DUR - (t - start) / 1000);
+    backdrop(t, [16, 70, 60], [16, 40, 96]);
+    g.fillStyle = 'rgba(255,255,255,.05)'; for (let x = 0; x < W; x += 60) g.fillRect(x, TOP, 1, H); for (let y = TOP; y < H; y += 60) g.fillRect(0, y, W, 1);
+    for (const it of items) {
+      if (t - it.born > 5500 && (t / 150 | 0) % 2) continue;
+      const { x, y, kind } = it;
+      if (kind === 'coin') { glow(x, y, 30, [120, 96, 10]); const ew = Math.max(3, 12 * Math.abs(Math.cos(t / 180 + it.born))); g.fillStyle = css(GOLD); g.fillRect(x - ew, y - 12, ew * 2, 24); g.strokeStyle = '#fff4b0'; g.lineWidth = 2; g.strokeRect(x - ew, y - 12, ew * 2, 24); }
+      else if (kind === 'gem') { glow(x, y, 36, [24, 120, 170]); g.fillStyle = '#60e2ff'; g.beginPath(); g.moveTo(x, y - 16); g.lineTo(x + 14, y); g.lineTo(x, y + 16); g.lineTo(x - 14, y); g.closePath(); g.fill(); g.strokeStyle = '#fff'; g.stroke(); }
+      else if (kind === 'bomb') { glow(x, y, 30, (t / 250 | 0) % 2 ? [150, 20, 30] : [90, 12, 20]); disc(x, y, 13, [36, 36, 46]); disc(x - 4, y - 4, 3, [90, 90, 110]); disc(x + 9, y - 18, 3, [255, 96, 50]); }
+      else { glow(x, y, 30, [16, 120, 56]); disc(x, y, 13, [72, 228, 110]); text('+', x, y - 1, { size: 26, bold: true, color: [0, 70, 20] }); }
     }
-    items = [];
-    startTime = performance.now();
-    running = true;
-    root.querySelector('.hint-bar').innerHTML = 'Собирай монеты, избегай бомб · ESC — меню';
-    updateHud();
-  }
-
-  root.querySelector('#btn2').onclick = () => start(2);
-  root.querySelector('#btn3').onclick = () => start(3);
-  root.querySelector('#btn4').onclick = () => start(4);
-
-  function spawn() {
-    const kinds = ['coin', 'coin', 'coin', 'gem', 'bomb', 'potion'];
-    const kind = kinds[Math.floor(Math.random() * kinds.length)];
-    items.push({
-      x: 40 + Math.random() * (W - 80),
-      y: 40 + Math.random() * (H - 80),
-      kind,
-      born: performance.now(),
-    });
-  }
-
-  function updateHud() {
-    const el = root.querySelector('#scores');
-    el.innerHTML = players.map(p =>
-      `<span style="color:${colors[p.i]}">${names[p.i]}: ${p.score}</span>`
-    ).join(' · ');
-  }
-
-  function keyDown(e) {
-    keys[e.key.toLowerCase()] = true;
-    keys[e.key] = true;
-    if (e.key === 'Escape') { cleanup(); onBack(); }
-  }
-  function keyUp(e) {
-    keys[e.key.toLowerCase()] = false;
-    keys[e.key] = false;
-  }
-
-  let lastSpawn = 0;
-  function update(now) {
-    if (!running) return;
-    const left = DURATION - (now - startTime);
-    if (left <= 0) {
-      running = false;
-      return;
+    for (const p of P) {
+      const col = t < p.stun ? [130, 134, 150] : PC[p.i];
+      glow(p.x, p.y, 46, dark(col, .6)); disc(p.x, p.y, R + 2, dark(col, .55)); disc(p.x, p.y, R, col); disc(p.x - 5, p.y - 5, 5, light(col, 70));
+      if (t < p.boost) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.arc(p.x, p.y, R + 6, 0, 6.283); g.stroke(); }
     }
-    if (now - lastSpawn > 700 && items.length < 16) {
-      lastSpawn = now;
-      spawn();
-    }
-    items = items.filter(it => now - it.born < 7000);
-
-    players.forEach(p => {
-      if (now < p.stun) return;
-      const c = controls[p.i];
-      const speed = now < p.boost ? 6.5 : 4;
-      let dx = 0, dy = 0;
-      if (keys[c.left] || keys[c.left.toUpperCase?.() || '']) dx -= 1;
-      if (keys[c.right] || keys[c.right.toUpperCase?.() || '']) dx += 1;
-      if (keys[c.up] || keys[c.up.toUpperCase?.() || '']) dy -= 1;
-      if (keys[c.down] || keys[c.down.toUpperCase?.() || '']) dy += 1;
-      // also raw key names
-      if (c.left === 'ArrowLeft' && keys['ArrowLeft']) dx -= 1;
-      if (c.right === 'ArrowRight' && keys['ArrowRight']) dx += 1;
-      if (c.up === 'ArrowUp' && keys['ArrowUp']) dy -= 1;
-      if (c.down === 'ArrowDown' && keys['ArrowDown']) dy += 1;
-
-      p.x = Math.max(15, Math.min(W - 15, p.x + dx * speed));
-      p.y = Math.max(15, Math.min(H - 15, p.y + dy * speed));
-
-      for (let i = items.length - 1; i >= 0; i--) {
-        const it = items[i];
-        if (Math.hypot(p.x - it.x, p.y - it.y) < 22) {
-          items.splice(i, 1);
-          if (it.kind === 'coin') p.score += 1;
-          else if (it.kind === 'gem') p.score += 5;
-          else if (it.kind === 'bomb') { p.score = Math.max(0, p.score - 3); p.stun = now + 1200; }
-          else p.boost = now + 5000;
-          updateHud();
-        }
+    for (const p of P) chip(n < 4 ? 16 + p.i * 200 : 12 + p.i * 190, 10, `${PN[p.i]}  ${p.score}`, PC[p.i]);
+    g.fillStyle = 'rgb(40,46,78)'; g.fillRect(16, 52, W - 32, 4); g.fillStyle = css(left > 10 ? GOLD : RED); g.fillRect(16, 52, (W - 32) * left / DUR, 4);
+    if (t < msg[1]) pill(msg[0], H / 2);
+  }
+  start = now(); if (!await countdown(draw)) return 'menu';
+  start = lastSpawn = now();
+  for (;;) {
+    const t = now(), el = (t - start) / 1000;
+    if (pump().keys.some(e => is(e, 'Escape'))) return 'menu';
+    if (t - lastSpawn > 600 && items.length < 18) { lastSpawn = t; spawn(null, t); }
+    for (const k of [15, 30]) if (el >= k && !rain.has(k)) { rain.add(k); for (let i = 0; i < 14; i++) spawn('coin', t); msg = ['ЗОЛОТОЙ ДОЖДЬ!', t + 2000]; sfx('bonus'); FX.shake = 6; }
+    items = items.filter(it => t - it.born < 7000);
+    for (const p of P) {
+      if (t < p.stun) continue;
+      const [u, d, l, r] = ctrl[p.i].map(c => held.has(c)), sp = t < p.boost ? 7 : 4.6;
+      let dx = +r - +l, dy = +d - +u; if (dx && dy) { dx *= .7071; dy *= .7071; }
+      p.x = Math.max(R, Math.min(W - R, p.x + dx * sp)); p.y = Math.max(TOP + R, Math.min(H - R, p.y + dy * sp));
+      if (dx || dy) FX.p.push([p.x, p.y, 0, 0, 14, 14, PC[p.i], 6]);
+      for (const it of [...items]) {
+        if ((p.x - it.x) ** 2 + (p.y - it.y) ** 2 >= 841) continue;
+        items.splice(items.indexOf(it), 1); const { x, y } = it;
+        if (it.kind === 'coin') { p.score++; floater(x, y, '+1', GOLD); burst(x, y, GOLD, 8, 3); sfx('coin'); }
+        else if (it.kind === 'gem') { p.score += 5; floater(x, y, '+5', [120, 230, 255]); burst(x, y, [80, 220, 255], 18, 5); sfx('bonus'); }
+        else if (it.kind === 'bomb') { p.score = Math.max(0, p.score - 3); p.stun = t + 1200; floater(x, y, '-3', [255, 80, 90]); burst(x, y, [255, 110, 40], 30, 6); FX.shake = 8; sfx('boom'); }
+        else { p.boost = t + 5000; floater(x, y, 'СКОРОСТЬ!', [100, 255, 130]); burst(x, y, [80, 255, 120], 14, 4); sfx('bonus'); }
       }
-    });
-  }
-
-  function draw(now) {
-    ctx.fillStyle = '#0e1a12';
-    ctx.fillRect(0, 0, W, H);
-    // grid
-    ctx.strokeStyle = '#1a2e22';
-    for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
-    items.forEach(it => {
-      ctx.beginPath();
-      if (it.kind === 'coin') {
-        ctx.fillStyle = '#fbbf24';
-        ctx.arc(it.x, it.y, 11, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (it.kind === 'gem') {
-        ctx.fillStyle = '#22d3ee';
-        ctx.moveTo(it.x, it.y - 14); ctx.lineTo(it.x + 12, it.y); ctx.lineTo(it.x, it.y + 14); ctx.lineTo(it.x - 12, it.y);
-        ctx.closePath(); ctx.fill();
-      } else if (it.kind === 'bomb') {
-        ctx.fillStyle = '#ef4444';
-        ctx.arc(it.x, it.y, 12, 0, Math.PI * 2); ctx.fill();
-      } else {
-        ctx.fillStyle = '#4ade80';
-        ctx.arc(it.x, it.y, 12, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#052e16';
-        ctx.font = 'bold 16px Rubik';
-        ctx.textAlign = 'center';
-        ctx.fillText('+', it.x, it.y + 5);
-      }
-    });
-
-    players.forEach(p => {
-      const col = now < p.stun ? '#666' : colors[p.i];
-      ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 16, 0, Math.PI * 2);
-      ctx.fill();
-      if (now < p.boost) {
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    });
-
-    if (running) {
-      const left = Math.max(0, DURATION - (now - startTime));
-      ctx.fillStyle = '#1e1b4b';
-      ctx.fillRect(20, H - 18, W - 40, 8);
-      ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(20, H - 18, (W - 40) * left / DURATION, 8);
-    } else if (players.length) {
-      const sorted = [...players].sort((a, b) => b.score - a.score);
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#ffd54a';
-      ctx.font = 'bold 36px Rubik';
-      ctx.textAlign = 'center';
-      ctx.fillText(`Победил ${names[sorted[0].i]}!`, W / 2, H / 2 - 20);
-      ctx.font = '18px Rubik';
-      ctx.fillStyle = '#ddd';
-      sorted.forEach((p, i) => {
-        ctx.fillText(`${names[p.i]}: ${p.score}`, W / 2, H / 2 + 20 + i * 28);
-      });
-    } else {
-      ctx.fillStyle = '#9b97b8';
-      ctx.font = '22px Rubik';
-      ctx.textAlign = 'center';
-      ctx.fillText('Выбери количество игроков кнопками ниже', W / 2, H / 2);
+    }
+    draw(t); updateFx(); drawFx(); await present();
+    if (DUR - el <= 0) {
+      const rk = [...P].sort((a, b) => b.score - a.score), tie = rk.length > 1 && rk[0].score === rk[1].score;
+      return endScreen(tie ? 'Ничья!' : `Победил ${PN[rk[0].i]}!`, rk.map(q => `${PN[q.i]}: ${q.score}`), tie ? GOLD : PC[rk[0].i]);
     }
   }
-
-  function loop(now) {
-    update(now);
-    draw(now);
-    animId = requestAnimationFrame(loop);
-  }
-
-  function cleanup() {
-    cancelAnimationFrame(animId);
-    window.removeEventListener('keydown', keyDown);
-    window.removeEventListener('keyup', keyUp);
-  }
-  window.__gameCleanup = cleanup;
-  window.addEventListener('keydown', keyDown);
-  window.addEventListener('keyup', keyUp);
-  animId = requestAnimationFrame(loop);
 }
+async function coins() { const n = await choosePlayers('Сбор монет', GOLD); if (!n) return; while (await coinRush(n) === 'again'); }

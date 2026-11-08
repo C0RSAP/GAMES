@@ -1,232 +1,90 @@
-import { WORDS5 } from '../words/words5.js';
-import { WORDS6 } from '../words/words6.js';
-
-const USED_KEY = 'arcade_wordle_used';
-
-function loadUsed() {
-  try {
-    return JSON.parse(localStorage.getItem(USED_KEY) || '{"5":[],"6":[]}');
-  } catch {
-    return { '5': [], '6': [] };
-  }
+'use strict';
+// ===== 8. Wordle (5 или 6 букв, слова не повторяются — хранятся в localStorage) =====
+const BLOCKED = new Set(['оргазм', 'пиндос', 'параша', 'нацмен', 'похоть']);
+const SECRET = { 5: WORDS5.filter(w => !BLOCKED.has(w)), 6: WORDS6.filter(w => !BLOCKED.has(w)) };
+const VOCAB = { 5: new Set(WORDS5), 6: new Set(WORDS6) };
+const loadUsed = () => { try { const d = JSON.parse(localStorage.getItem('wordle_used')) || {}; return { 5: new Set(d[5] || []), 6: new Set(d[6] || []) }; } catch (_) { return { 5: new Set(), 6: new Set() }; } };
+const saveUsed = u => { try { localStorage.setItem('wordle_used', JSON.stringify({ 5: [...u[5]], 6: [...u[6]] })); } catch (_) { } };
+function freshWord(n) {
+  const u = loadUsed(); let pool = SECRET[n].filter(w => !u[n].has(w));
+  if (!pool.length) { u[n].clear(); pool = SECRET[n]; }
+  const w = pick(pool); u[n].add(w); saveUsed(u); return w;
 }
+const KB = ['йцукенгшщзхъ', 'фывапролджэ', 'ячсмитьбю'];
+const WC = { green: GREEN, yellow: YELLOW, gray: GRAY };
 
-function saveUsed(data) {
-  localStorage.setItem(USED_KEY, JSON.stringify(data));
-}
-
-function pickWord(len) {
-  const used = loadUsed();
-  const pool = len === 5 ? WORDS5 : WORDS6;
-  const usedSet = new Set(used[String(len)] || []);
-  let available = pool.filter(w => !usedSet.has(w));
-  if (available.length === 0) {
-    used[String(len)] = [];
-    saveUsed(used);
-    available = pool.slice();
-  }
-  const word = available[Math.floor(Math.random() * available.length)];
-  used[String(len)] = [...(used[String(len)] || []), word];
-  saveUsed(used);
-  return word;
-}
-
-function checkGuess(guess, secret) {
-  const len = secret.length;
-  const res = Array(len).fill('gray');
-  const counts = {};
-  for (const c of secret) counts[c] = (counts[c] || 0) + 1;
-  for (let i = 0; i < len; i++) {
-    if (guess[i] === secret[i]) {
-      res[i] = 'green';
-      counts[guess[i]]--;
+async function wordle() {
+  FX.reset();
+  const u = loadUsed(), fresh = n => SECRET[n].filter(w => !u[n].has(w)).length, ACC = [110, 232, 190];
+  const cards = [[5, [W / 2 - 250, 210, 230, 170]], [6, [W / 2 + 20, 210, 230, 170]]];
+  let len = null;
+  while (!len) {
+    const { keys, clicks } = pump();
+    for (const e of keys) { if (is(e, 'Escape')) return; if (is(e, 'Digit5', 'Numpad5')) len = 5; if (is(e, 'Digit6', 'Numpad6')) len = 6; }
+    for (const c of clicks) for (const [n, r] of cards) if (inRect(c, r)) len = n;
+    backdrop(now(), [20, 80, 70], [30, 40, 110]);
+    text('WORDLE', W / 2, 110, { size: 112, bold: true, color: ACC }); text('Выбери длину слова', W / 2, 180, { size: 26, bold: true });
+    for (const [n, r] of cards) {
+      const hov = inRect(mouse, r), y = r[1] - (hov ? 4 : 0);
+      panel(r[0], y, r[2], r[3], { fill: `rgba(255,255,255,${hov ? .09 : .05})`, stroke: css(ACC, hov ? .82 : .31), r: 26, lw: 2 });
+      text(String(n), r[0] + r[2] / 2, y + 72, { size: 112, bold: true }); text('букв', r[0] + r[2] / 2, y + 128, { size: 26, bold: true, color: MUTED });
     }
+    text(`Новых слов осталось: ${fresh(5)} из ${SECRET[5].length} (5 букв), ${fresh(6)} из ${SECRET[6].length} (6 букв)`, W / 2, 430, { size: 15, color: FAINT });
+    text('Использованные слова запоминаются в браузере', W / 2, 456, { size: 15, color: FAINT });
+    hints([['5 6', 'выбрать'], ['ESC', 'назад']]); await present();
   }
-  for (let i = 0; i < len; i++) {
-    if (res[i] === 'gray' && counts[guess[i]] > 0) {
-      res[i] = 'yellow';
-      counts[guess[i]]--;
-    }
+  const secret = freshWord(len), TRIES = 6, CELL = 54, GAP = 6;
+  const grid = Array.from({ length: TRIES }, () => Array(len).fill('')), marks = Array(TRIES).fill(null), status = {};
+  const S = { row: 0, col: 0, msg: '', until: 0, shakeUntil: 0 };
+  const gx = (W - (len * CELL + (len - 1) * GAP)) / 2, gy = 58;
+  const toast = (m, t) => { S.msg = m; S.until = t + 1700; };
+  function check(guess) {
+    const res = Array(len).fill('gray'), left = {};
+    for (const c of secret) left[c] = (left[c] || 0) + 1;
+    for (let i = 0; i < len; i++) if (guess[i] === secret[i]) { res[i] = 'green'; left[guess[i]]--; }
+    for (let i = 0; i < len; i++) if (res[i] === 'gray' && (left[guess[i]] || 0) > 0) { res[i] = 'yellow'; left[guess[i]]--; }
+    return res;
   }
-  return res;
-}
-
-function toast(msg, ms = 1600) {
-  const el = document.createElement('div');
-  el.className = 'toast';
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), ms);
-}
-
-export function startWordle(root, onBack) {
-  let length = null;
-  let secret = '';
-  let row = 0;
-  let col = 0;
-  let grid = [];
-  let colors = [];
-  let letterStatus = {};
-  let finished = false;
-  const maxTries = 6;
-
-  const KB_ROWS = ['йцукенгшщзхъ', 'фывапролджэ', 'ячсмитьбю'];
-
-  function renderChoice() {
-    root.innerHTML = `
-      <h1 class="game-title">WORDLE</h1>
-      <p class="game-sub">Выбери длину слова · слова не повторяются</p>
-      <div class="mode-cards">
-        <button class="mode-card" data-len="5">
-          <strong>5 букв</strong>
-          <span>${WORDS5.length.toLocaleString('ru')} слов в базе</span>
-        </button>
-        <button class="mode-card" data-len="6">
-          <strong>6 букв</strong>
-          <span>${WORDS6.length.toLocaleString('ru')} слов в базе</span>
-        </button>
-      </div>
-    `;
-    root.querySelectorAll('[data-len]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        length = +btn.dataset.len;
-        secret = pickWord(length);
-        grid = Array.from({ length: maxTries }, () => Array(length).fill(''));
-        colors = Array.from({ length: maxTries }, () => Array(length).fill(''));
-        letterStatus = {};
-        row = 0; col = 0; finished = false;
-        renderGame();
-      });
-    });
-  }
-
-  function renderGame() {
-    const cellSize = length === 5 ? 54 : 48;
-    let rowsHtml = '';
-    for (let r = 0; r < maxTries; r++) {
-      let cells = '';
-      for (let c = 0; c < length; c++) {
-        const ch = grid[r][c];
-        const st = colors[r][c];
-        cells += `<div class="wordle-cell ${st || ''} ${ch ? 'filled' : ''}" style="width:${cellSize}px;height:${cellSize}px">${ch}</div>`;
+  function draw(t) {
+    backdrop(t, [20, 80, 70], [30, 40, 110]); text('WORDLE', W / 2, 30, { size: 26, bold: true, color: ACC });
+    for (let r = 0; r < TRIES; r++) {
+      const sh = (r === S.row && t < S.shakeUntil) ? Math.sin(t / 22) * 6 : 0;
+      for (let c = 0; c < len; c++) {
+        const x = gx + c * (CELL + GAP) + sh, y = gy + r * (CELL + GAP), m = marks[r] && marks[r][c], ch = grid[r][c];
+        if (m) panel(x, y, CELL, CELL, { fill: css(WC[m]), stroke: null, r: 8 });
+        else panel(x, y, CELL, CELL, { fill: 'rgba(255,255,255,.05)', stroke: ch ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.16)', r: 8, lw: 2 });
+        if (ch) text(ch.toUpperCase(), x + CELL / 2, y + CELL / 2 + 1, { size: 30, bold: true });
       }
-      rowsHtml += `<div class="wordle-row">${cells}</div>`;
     }
-
-    let kbHtml = KB_ROWS.map((rowStr, ri) => {
-      let keys = '';
-      if (ri === 2) keys += `<button class="kb-key wide" data-key="Enter">↵</button>`;
-      for (const ch of rowStr) {
-        const st = letterStatus[ch] || '';
-        keys += `<button class="kb-key ${st}" data-key="${ch}">${ch}</button>`;
-      }
-      if (ri === 2) keys += `<button class="kb-key wide" data-key="Backspace">⌫</button>`;
-      return `<div class="kb-row">${keys}</div>`;
-    }).join('');
-
-    let result = '';
-    if (finished) {
-      const win = grid[row - (finished === 'win' ? 1 : 0)]?.join('') === secret || grid.some(r => r.join('') === secret);
-      const isWin = finished === 'win';
-      result = `
-        <div class="result-banner ${isWin ? 'win' : 'lose'}">
-          <h3>${isWin ? 'Отлично!' : 'Не вышло'}</h3>
-          <p>${isWin ? `Угадано за ${row} ${row === 1 ? 'попытку' : row < 5 ? 'попытки' : 'попыток'}` : `Слово: <strong>${secret.toUpperCase()}</strong>`}</p>
-          <div class="btn-row" style="margin-top:14px">
-            <button class="btn btn-primary" id="again">Ещё раз</button>
-            <button class="btn btn-ghost" id="to-menu">В меню</button>
-          </div>
-        </div>
-      `;
-    }
-
-    root.innerHTML = `
-      <h1 class="game-title">WORDLE · ${length} букв</h1>
-      <p class="game-sub">Вводи слово и жми Enter</p>
-      <div class="wordle-grid">${rowsHtml}</div>
-      ${result}
-      <div class="keyboard">${kbHtml}</div>
-    `;
-
-    root.querySelectorAll('.kb-key').forEach(btn => {
-      btn.addEventListener('click', () => handleKey(btn.dataset.key));
-    });
-    root.querySelector('#again')?.addEventListener('click', () => {
-      secret = pickWord(length);
-      grid = Array.from({ length: maxTries }, () => Array(length).fill(''));
-      colors = Array.from({ length: maxTries }, () => Array(length).fill(''));
-      letterStatus = {};
-      row = 0; col = 0; finished = false;
-      renderGame();
-    });
-    root.querySelector('#to-menu')?.addEventListener('click', onBack);
+    const ky = 440;
+    KB.forEach((row, i) => { const x0 = (W - (row.length * 45 - 5)) / 2; [...row].forEach((ch, j) => {
+      const st = status[ch]; panel(x0 + j * 45, ky + i * 47, 40, 42, { fill: st ? css(WC[st]) : 'rgba(255,255,255,.09)', stroke: null, r: 8 });
+      text(ch.toUpperCase(), x0 + j * 45 + 20, ky + i * 47 + 21, { size: 17, bold: true });
+    }); });
+    if (t < S.until) pill(S.msg, 420 - 10, GOLD);
+    hints([['Enter', 'отправить'], ['⌫', 'стереть'], ['ESC', 'в меню']], H - 34);
   }
-
-  function handleKey(key) {
-    if (finished) return;
-    if (key === 'Backspace') {
-      if (col > 0) {
-        col--;
-        grid[row][col] = '';
-        renderGame();
-      }
-      return;
-    }
-    if (key === 'Enter') {
-      if (col < length) return;
-      const guess = grid[row].join('');
-      const dict = length === 5 ? WORDS5 : WORDS6;
-      if (!dict.includes(guess) && guess !== secret) {
-        toast('Нет такого слова в словаре');
-        return;
-      }
-      const res = checkGuess(guess, secret);
-      colors[row] = res;
-      res.forEach((st, i) => {
-        const ch = guess[i];
-        const prev = letterStatus[ch];
-        if (st === 'green' || (st === 'yellow' && prev !== 'green') || (st === 'gray' && !prev)) {
-          letterStatus[ch] = st;
+  for (;;) {
+    const t = now();
+    for (const e of pump().keys) {
+      if (is(e, 'Escape')) return;
+      if (is(e, 'Backspace')) { if (S.col > 0) grid[S.row][--S.col] = ''; continue; }
+      if (is(e, 'Enter', 'NumpadEnter')) {
+        if (S.col < len) { toast('Не хватает букв', t); S.shakeUntil = t + 400; sfx('bad'); continue; }
+        const guess = grid[S.row].join('');
+        if (!VOCAB[len].has(guess)) { toast('Нет такого слова', t); S.shakeUntil = t + 400; sfx('bad'); continue; }
+        const res = check(guess); marks[S.row] = res;
+        res.forEach((m, i) => { const ch = guess[i], o = status[ch]; if (!o || (o === 'gray') || (o === 'yellow' && m === 'green')) status[ch] = m; });
+        sfx('hit'); const won = guess === secret; S.row++; S.col = 0;
+        if (won || S.row === TRIES) {
+          await finishAnim(draw, 30);
+          const r = await endScreen(won ? 'Угадано!' : 'Не угадал', won ? [`Слово: ${secret.toUpperCase()}`, `Попыток: ${S.row} из ${TRIES}`] : [`Слово было: ${secret.toUpperCase()}`], won ? GREEN : RED);
+          return r === 'again' ? wordle() : undefined;
         }
-      });
-      if (guess === secret) {
-        finished = 'win';
-        row++;
-      } else {
-        row++;
-        col = 0;
-        if (row >= maxTries) finished = 'lose';
+        continue;
       }
-      renderGame();
-      return;
+      const ch = ruLetter(e); if (ch && S.col < len) grid[S.row][S.col++] = ch;
     }
-    // letter
-    const ch = key.toLowerCase().replace('ё', 'е');
-    if (ch.length === 1 && ch >= 'а' && ch <= 'я' && col < length) {
-      grid[row][col] = ch;
-      col++;
-      renderGame();
-    }
+    draw(t); await present();
   }
-
-  function onKeyDown(e) {
-    if (e.key === 'Escape') { onBack(); return; }
-    if (finished && (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К')) {
-      secret = pickWord(length);
-      grid = Array.from({ length: maxTries }, () => Array(length).fill(''));
-      colors = Array.from({ length: maxTries }, () => Array(length).fill(''));
-      letterStatus = {};
-      row = 0; col = 0; finished = false;
-      renderGame();
-      return;
-    }
-    if (e.key === 'Backspace') handleKey('Backspace');
-    else if (e.key === 'Enter') handleKey('Enter');
-    else if (e.key.length === 1) handleKey(e.key);
-  }
-
-  window.addEventListener('keydown', onKeyDown);
-  window.__gameCleanup = () => window.removeEventListener('keydown', onKeyDown);
-
-  renderChoice();
 }

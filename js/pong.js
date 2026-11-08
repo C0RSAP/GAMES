@@ -1,125 +1,58 @@
-/**
- * Понг+ — 2 игрока
- * Игрок 1: W/S   Игрок 2: ↑/↓
- */
-export function startPong(root, onBack) {
-  root.innerHTML = `
-    <div class="game-wrap">
-      <div class="hud">
-        <span id="p1s" style="color:#4ade80">0</span>
-        <span class="title">ПОНГ+</span>
-        <span id="p2s" style="color:#60a5fa">0</span>
-      </div>
-      <canvas id="c" width="900" height="520"></canvas>
-      <div class="hint-bar">W/S vs ↑/↓ · до 7 очков · ESC — меню</div>
-    </div>`;
-
-  const canvas = root.querySelector('#c');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  let scores = [0, 0];
-  const WIN = 7;
-  let running = true, animId = 0;
-
-  const paddles = [
-    { x: 30, y: H / 2 - 50, w: 14, h: 100, color: '#4ade80' },
-    { x: W - 44, y: H / 2 - 50, w: 14, h: 100, color: '#60a5fa' },
-  ];
-  let ball = { x: W / 2, y: H / 2, vx: 0, vy: 0 };
-  const keys = {};
-
-  function serve(dir) {
-    const a = (Math.random() - 0.5) * 1.2;
-    ball = { x: W / 2, y: H / 2, vx: dir * 6, vy: Math.sin(a) * 5 };
+'use strict';
+// ===== 3. Понг+ (W/S и стрелки вверх/вниз, до 7) =====
+async function pongMatch() {
+  FX.reset();
+  const P = [{ x: 30, y: H / 2 - 50, h: 100, up: 'KeyW', dn: 'KeyS', score: 0, big: 0, small: 0, color: PC[0], name: PN[0] },
+    { x: W - 44, y: H / 2 - 50, h: 100, up: 'ArrowUp', dn: 'ArrowDown', score: 0, big: 0, small: 0, color: PC[1], name: PN[1] }];
+  const B = { x: W / 2, y: H / 2, vx: 0, vy: 0, last: null, trail: [] }, WIN = 7, PW = 14;
+  let orb = null, msg = ['', 0], serveAt = 0;
+  const serve = (dir, t) => { const a = rnd(-.7, .7); Object.assign(B, { x: W / 2, y: H / 2, vx: dir * 6 * Math.cos(a), vy: 6 * Math.sin(a), last: null, trail: [] }); serveAt = t + 900; };
+  const rdir = () => Math.random() < .5 ? -1 : 1;
+  function draw(t) {
+    backdrop(t, [34, 40, 120], [84, 26, 96]);
+    g.fillStyle = 'rgb(60,66,104)'; for (let y = 10; y < H; y += 32) g.fillRect(W / 2 - 2, y, 4, 16);
+    g.fillStyle = 'rgb(70,76,118)'; g.fillRect(0, 0, W, 4); g.fillRect(0, H - 4, W, 4);
+    text(String(P[0].score), W / 2 - 120, 100, { size: 112, bold: true, color: dark(P[0].color, .55) }); text(String(P[1].score), W / 2 + 120, 100, { size: 112, bold: true, color: dark(P[1].color, .55) });
+    text(`до ${WIN}`, W / 2, 24, { color: FAINT });
+    B.trail.forEach(([x, y], i) => disc(x, y, 2 + 7 * (i + 1) / B.trail.length, dark([200, 210, 255], (i + 1) / B.trail.length * .45)));
+    glow(B.x, B.y, 40, [110, 116, 170]); disc(B.x, B.y, 9, WHITE);
+    if (t < serveAt) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.arc(B.x, B.y, 16 + 8 * Math.sin(t / 90), 0, 6.283); g.stroke(); }
+    for (const p of P) { glow(p.x + PW / 2, p.y + p.h / 2, 70, dark(p.color, .5)); g.fillStyle = css(p.color); g.fillRect(p.x, p.y, PW, p.h); g.strokeStyle = css(light(p.color, 70)); g.lineWidth = 2; g.strokeRect(p.x, p.y, PW, p.h); }
+    if (orb) { glow(orb.x + 15, orb.y + 15, 44, [150, 120, 20]); disc(orb.x + 15, orb.y + 15, 15, GOLD); text('?', orb.x + 15, orb.y + 15, { size: 20, bold: true, color: [80, 46, 0] }); }
+    if (t < msg[1]) pill(msg[0], H - 40);
   }
-  serve(Math.random() < 0.5 ? 1 : -1);
-
-  function keyDown(e) {
-    keys[e.key] = true;
-    if (e.key === 'Escape') { cleanup(); onBack(); }
-    if (['ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault();
-  }
-  function keyUp(e) { keys[e.key] = false; }
-
-  function update() {
-    if (keys['w'] || keys['W']) paddles[0].y -= 8;
-    if (keys['s'] || keys['S']) paddles[0].y += 8;
-    if (keys['ArrowUp']) paddles[1].y -= 8;
-    if (keys['ArrowDown']) paddles[1].y += 8;
-    paddles.forEach(p => { p.y = Math.max(0, Math.min(H - p.h, p.y)); });
-
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-    if (ball.y < 10 || ball.y > H - 10) { ball.vy *= -1; ball.y = Math.max(10, Math.min(H - 10, ball.y)); }
-
-    paddles.forEach((p, i) => {
-      if (ball.x > p.x && ball.x < p.x + p.w && ball.y > p.y && ball.y < p.y + p.h) {
-        const off = (ball.y - (p.y + p.h / 2)) / (p.h / 2);
-        const speed = Math.min(Math.hypot(ball.vx, ball.vy) * 1.05, 14);
-        ball.vy = off * speed * 0.8;
-        ball.vx = Math.sqrt(Math.max(speed * speed - ball.vy * ball.vy, 1)) * (i === 0 ? 1 : -1);
-        ball.x = i === 0 ? p.x + p.w + 2 : p.x - 2;
+  serve(rdir(), now()); serveAt = 0; if (!await countdown(draw)) return 'menu'; serve(rdir(), now());
+  for (;;) {
+    const t = now();
+    if (pump().keys.some(e => is(e, 'Escape'))) return 'menu';
+    for (const p of P) {
+      if (held.has(p.up)) p.y -= 8; if (held.has(p.dn)) p.y += 8;
+      const cy = p.y + p.h / 2; p.h = t < p.big ? 170 : t < p.small ? 60 : 100; p.y = Math.max(0, Math.min(H - p.h, cy - p.h / 2));
+    }
+    if (t >= serveAt) {
+      B.x += B.vx; B.y += B.vy; B.trail.push([B.x, B.y]); if (B.trail.length > 16) B.trail.shift();
+      if (B.y < 9) { B.y = 9; B.vy = Math.abs(B.vy); sfx('beep'); } if (B.y > H - 9) { B.y = H - 9; B.vy = -Math.abs(B.vy); sfx('beep'); }
+      P.forEach((p, i) => {
+        const cx = p.x + PW / 2, coming = i === 0 ? B.vx < 0 : B.vx > 0, front = i === 0 ? B.x > cx : B.x < cx;
+        if (coming && front && B.x + 9 > p.x && B.x - 9 < p.x + PW && B.y + 9 > p.y && B.y - 9 < p.y + p.h) {
+          const off = Math.max(-1, Math.min(1, (B.y - (p.y + p.h / 2)) / (p.h / 2 + 9))), sp = Math.min(Math.hypot(B.vx, B.vy) * 1.06, 16), vy = off * sp * .75;
+          B.vx = Math.sqrt(Math.max(sp * sp - vy * vy, 1)) * (i === 0 ? 1 : -1); B.vy = vy; B.x = i === 0 ? p.x + PW + 10 : p.x - 10; B.last = i;
+          burst(B.x, B.y, p.color, 12, 5); FX.shake = Math.max(FX.shake, 3); sfx('hit');
+        }
+      });
+      if (!orb && Math.random() < .004) orb = { x: rnd(W / 2 - 250, W / 2 + 220), y: rnd(80, H - 110) };
+      if (orb && B.last !== null && B.x + 9 > orb.x && B.x - 9 < orb.x + 30 && B.y + 9 > orb.y && B.y - 9 < orb.y + 30) {
+        const me = P[B.last], en = P[1 - B.last], eff = pick(['big', 'small', 'slow', 'fast']);
+        if (eff === 'big') { me.big = t + 8000; msg = [`${me.name}: ракетка больше!`, t + 2000]; }
+        else if (eff === 'small') { en.small = t + 8000; msg = [`${me.name}: ракетка врага меньше!`, t + 2000]; }
+        else if (eff === 'slow') { B.vx *= .6; B.vy *= .6; msg = ['Мяч замедлился', t + 2000]; }
+        else { B.vx *= 1.4; B.vy *= 1.4; msg = ['Мяч ускорился!', t + 2000]; }
+        burst(orb.x + 15, orb.y + 15, GOLD, 24, 6); sfx('bonus'); orb = null;
       }
-    });
-
-    if (ball.x < 0) { scores[1]++; updateScore(); serve(1); }
-    if (ball.x > W) { scores[0]++; updateScore(); serve(-1); }
-  }
-
-  function updateScore() {
-    root.querySelector('#p1s').textContent = scores[0];
-    root.querySelector('#p2s').textContent = scores[1];
-    if (scores[0] >= WIN || scores[1] >= WIN) {
-      running = false;
+      if (B.x < 0 || B.x > W) { const s = B.x < 0 ? 1 : 0; P[s].score++; burst(Math.max(5, Math.min(W - 5, B.x)), B.y, P[s].color, 40, 7, 50); FX.shake = 10; sfx('boom'); serve(s === 1 ? -1 : 1, t); }
     }
+    draw(t); updateFx(); drawFx(); await present();
+    for (const p of P) if (p.score >= WIN) return endScreen(`Победил ${p.name}!`, [`Счёт: ${P[0].score} : ${P[1].score}`], p.color);
   }
-
-  function draw() {
-    ctx.fillStyle = '#0c0b18';
-    ctx.fillRect(0, 0, W, H);
-    // center line
-    ctx.strokeStyle = '#2a2748';
-    ctx.setLineDash([12, 12]);
-    ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
-    ctx.setLineDash([]);
-
-    paddles.forEach(p => {
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.roundRect(p.x, p.y, p.w, p.h, 6);
-      ctx.fill();
-    });
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, 9, 0, Math.PI * 2);
-    ctx.fill();
-
-    if (!running) {
-      ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#ffd54a';
-      ctx.font = 'bold 40px Rubik';
-      ctx.textAlign = 'center';
-      const win = scores[0] >= WIN ? 'Зелёный' : 'Синий';
-      ctx.fillText(`Победил ${win}!`, W / 2, H / 2);
-    }
-  }
-
-  function loop() {
-    if (!running && scores[0] < WIN && scores[1] < WIN) return;
-    if (running) update();
-    draw();
-    animId = requestAnimationFrame(loop);
-  }
-
-  function cleanup() {
-    running = false;
-    cancelAnimationFrame(animId);
-    window.removeEventListener('keydown', keyDown);
-    window.removeEventListener('keyup', keyUp);
-  }
-  window.__gameCleanup = cleanup;
-  window.addEventListener('keydown', keyDown);
-  window.addEventListener('keyup', keyUp);
-  loop();
 }
+async function pong() { while (await pongMatch() === 'again'); }

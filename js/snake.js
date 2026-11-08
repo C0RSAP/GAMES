@@ -1,169 +1,103 @@
-/**
- * Змейка — 2 игрока на одной клавиатуре
- * Игрок 1: WASD   Игрок 2: стрелки
- */
-export function startSnake(root, onBack) {
-  root.innerHTML = `
-    <div class="game-wrap">
-      <div class="hud">
-        <span id="s1" style="color:#4ade80">Зелёный: 0</span>
-        <span class="title">ЗМЕЙКА</span>
-        <span id="s2" style="color:#60a5fa">Синий: 0</span>
-      </div>
-      <canvas id="c" width="900" height="540"></canvas>
-      <div class="hint-bar">WASD vs Стрелки · ESC — меню · R — рестарт раунда</div>
-    </div>`;
-
-  const canvas = root.querySelector('#c');
-  const ctx = canvas.getContext('2d');
-  const CELL = 20;
-  const COLS = 45, ROWS = 25;
-  let wins = [0, 0];
-  let running = true;
-  let animId = 0;
-
-  function resetRound() {
-    return {
-      players: [
-        { body: [[6, 12], [5, 12], [4, 12]], dir: [1, 0], next: [1, 0], color: '#4ade80', name: 'Зелёный', alive: true, grow: 0 },
-        { body: [[38, 12], [39, 12], [40, 12]], dir: [-1, 0], next: [-1, 0], color: '#60a5fa', name: 'Синий', alive: true, grow: 0 },
-      ],
-      apples: [],
-      tick: 0,
-      over: false,
-      winner: null,
-    };
-  }
-
-  let state = resetRound();
-  for (let i = 0; i < 3; i++) spawnApple(state);
-
-  function spawnApple(s) {
-    for (let t = 0; t < 50; t++) {
-      const x = Math.floor(Math.random() * COLS);
-      const y = Math.floor(Math.random() * ROWS);
-      if (s.players.every(p => !p.body.some(b => b[0] === x && b[1] === y)) &&
-          !s.apples.some(a => a[0] === x && a[1] === y)) {
-        s.apples.push([x, y]);
-        return;
-      }
+'use strict';
+// ===== 1. Змейка (2 игрока: WASD и стрелки) =====
+async function snakeRound(wins) {
+  FX.reset();
+  const CELL = 20, OY = 60, COLS = W / CELL | 0, ROWS = (H - OY) / CELL | 0, mid = ROWS >> 1;
+  const P = [
+    { name: PN[0], color: PC[0], body: [[6, mid], [5, mid], [4, mid]], dir: [1, 0], keys: { KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] } },
+    { name: PN[1], color: PC[1], body: [[COLS - 7, mid], [COLS - 6, mid], [COLS - 5, mid]], dir: [-1, 0], keys: { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] } }];
+  P.forEach(p => Object.assign(p, { grow: 0, last: 0, boost: 0, freeze: 0, alive: true, q: [], nw: null, moving: false }));
+  const items = new Map(), K = c => c[0] + ',' + c[1], has = (b, c) => b.some(s => s[0] === c[0] && s[1] === c[1]);
+  let msg = ['', 0];
+  const dots = document.createElement('canvas'); dots.width = W; dots.height = H - OY;
+  const dg = dots.getContext('2d'); dg.fillStyle = 'rgba(255,255,255,.07)';
+  for (let x = 0; x < COLS; x++) for (let y = 0; y < ROWS; y++) { dg.beginPath(); dg.arc(x * CELL + 10, y * CELL + 10, 1, 0, 6.283); dg.fill(); }
+  const cpos = c => [c[0] * CELL + CELL / 2, OY + c[1] * CELL + CELL / 2];
+  function addItem(kind) {
+    for (let i = 0; i < 500; i++) {
+      const c = [Math.random() * COLS | 0, Math.random() * ROWS | 0];
+      if (!items.has(K(c)) && P.every(p => !has(p.body, c))) { items.set(K(c), kind); return; }
     }
   }
-
-  function key(e) {
-    if (e.key === 'Escape') { cleanup(); onBack(); return; }
-    if (e.key === 'r' || e.key === 'R') {
-      if (state.over) {
-        state = resetRound();
-        for (let i = 0; i < 3; i++) spawnApple(state);
-      }
-      return;
+  const count = k => [...items.values()].filter(v => v === k).length;
+  function drawSnake(p, t) {
+    const n = p.body.length, base = t < p.freeze ? [170, 222, 255] : p.color;
+    for (let j = n - 1; j > 0; j--) {
+      const a = cpos(p.body[j]), b = cpos(p.body[j - 1]);
+      g.fillStyle = css(mix(base, dark(base, .4), j / Math.max(n - 1, 1) * .9));
+      g.beginPath(); g.roundRect(Math.min(a[0], b[0]) - 7, Math.min(a[1], b[1]) - 7, Math.abs(a[0] - b[0]) + 14, Math.abs(a[1] - b[1]) + 14, 6); g.fill();
     }
-    if (state.over) return;
-    const map = {
-      w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
-      ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
-    };
-    const d = map[e.key];
-    if (!d) return;
-    e.preventDefault();
-    const p = (e.key.length === 1) ? state.players[0] : state.players[1];
-    if (d[0] + p.dir[0] !== 0 || d[1] + p.dir[1] !== 0) p.next = d;
+    const [hx, hy] = cpos(p.body[0]); if (t < p.boost) glow(hx, hy, 40, dark(p.color, .8));
+    g.fillStyle = css(light(base, 25)); g.beginPath(); g.roundRect(hx - 9, hy - 9, 18, 18, 7); g.fill();
+    const [dx, dy] = p.dir;
+    for (const s of [-1, 1]) { const ex = hx + dx * 3 - dy * 4 * s, ey = hy + dy * 3 + dx * 4 * s; disc(ex, ey, 3, WHITE); disc(ex + dx, ey + dy, 1, [10, 10, 20]); }
   }
-
-  function step() {
-    if (state.over) return;
-    state.tick++;
-    if (state.tick % 6 !== 0) return;
-
-    state.players.forEach((p, i) => {
-      if (!p.alive) return;
-      p.dir = p.next;
-      const head = [p.body[0][0] + p.dir[0], p.body[0][1] + p.dir[1]];
-      const other = state.players[1 - i];
-      if (head[0] < 0 || head[0] >= COLS || head[1] < 0 || head[1] >= ROWS ||
-          p.body.some(b => b[0] === head[0] && b[1] === head[1]) ||
-          other.body.some(b => b[0] === head[0] && b[1] === head[1])) {
-        p.alive = false;
-        return;
+  function drawScene(t) {
+    backdrop(t, [44, 36, 104], [12, 60, 96]); g.drawImage(dots, 0, OY);
+    const pulse = Math.sin(t / 200);
+    for (const [k, kind] of items) {
+      const [x, y] = cpos(k.split(',').map(Number));
+      if (kind === 'apple') {
+        glow(x, y, 26, [130, 28, 40]); disc(x, y, 8, [255, 82, 98]); disc(x - 3, y - 3, 3, [255, 190, 196]);
+        g.strokeStyle = 'rgb(90,220,130)'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y - 8); g.lineTo(x + 4, y - 13); g.stroke();
+      } else { glow(x, y, 34, [150, 120, 20]); disc(x, y, 9 + 2 * pulse, GOLD); text('?', x, y, { size: 17, bold: true, color: [80, 46, 0] }); }
+    }
+    P.forEach(p => drawSnake(p, t));
+    chip(16, 12, `${P[0].name}  ${wins[0]}`, P[0].color); chip(W - 16, 12, `${P[1].name}  ${wins[1]}`, P[1].color, 'right');
+    if (t < msg[1]) pill(msg[0], 30);
+  }
+  addItem('apple'); addItem('apple');
+  if (!await countdown(drawScene)) return 'menu';
+  let t = now(), lastBonus = t; P.forEach(p => p.last = t);
+  for (;;) {
+    t = now();
+    for (const e of pump().keys) {
+      if (is(e, 'Escape')) return 'menu';
+      for (const p of P) {
+        const nd = p.keys[e.code]; if (!nd) continue;
+        const ref = p.q.length ? p.q[p.q.length - 1] : p.dir;
+        if ((nd[0] !== ref[0] || nd[1] !== ref[1]) && (nd[0] !== -ref[0] || nd[1] !== -ref[1]) && p.q.length < 3) p.q.push(nd);
       }
-      p.body.unshift(head);
-      const ai = state.apples.findIndex(a => a[0] === head[0] && a[1] === head[1]);
-      if (ai >= 0) {
-        state.apples.splice(ai, 1);
-        p.grow += 1;
-        spawnApple(state);
+    }
+    if (count('apple') < 2) addItem('apple');
+    if (t - lastBonus > 5000) { lastBonus = t; if (!count('bonus') && Math.random() < .7) addItem('bonus'); }
+    for (const p of P) { // обе змейки ходят одновременно
+      p.moving = false; if (t < p.freeze) continue;
+      if (t - p.last >= (t < p.boost ? 68 : 115)) {
+        p.last = t; if (p.q.length) p.dir = p.q.shift();
+        p.nw = [p.body[0][0] + p.dir[0], p.body[0][1] + p.dir[1]]; p.moving = true;
       }
-      if (p.grow > 0) p.grow--;
-      else p.body.pop();
+    }
+    const solid = p => (p.moving && p.grow === 0) ? p.body.slice(0, -1) : p.body;
+    const crashed = P.filter((p, i) => {
+      if (!p.moving) return false; const o = P[1 - i], nh = p.nw;
+      return nh[0] < 0 || nh[0] >= COLS || nh[1] < 0 || nh[1] >= ROWS || has(solid(p), nh) || has(solid(o), nh) || (o.moving && o.nw[0] === nh[0] && o.nw[1] === nh[1]);
     });
-
-    const dead = state.players.filter(p => !p.alive);
+    P.forEach((p, i) => {
+      if (!p.moving) return; if (crashed.includes(p)) { p.alive = false; return; }
+      const o = P[1 - i], nw = p.nw; p.body.unshift(nw);
+      const kind = items.get(K(nw)); items.delete(K(nw));
+      if (kind === 'apple') { p.grow++; burst(...cpos(nw), [255, 90, 100], 10, 3); sfx('coin'); }
+      else if (kind === 'bonus') {
+        burst(...cpos(nw), GOLD, 22, 5); sfx('bonus');
+        const eff = pick(['grow', 'shrink', 'boost', 'freeze']);
+        if (eff === 'grow') { p.grow += 4; msg = [`${p.name}: бонус — вырос на 4!`, t + 2500]; }
+        else if (eff === 'shrink') { for (let k = 0; k < 3; k++) if (o.body.length > 3) o.body.pop(); msg = [`${p.name}: бонус — враг стал короче!`, t + 2500]; }
+        else if (eff === 'boost') { p.boost = t + 5000; msg = [`${p.name}: бонус — УСКОРЕНИЕ!`, t + 2500]; }
+        else { o.freeze = t + 2500; msg = [`${p.name}: бонус — враг заморожен!`, t + 2500]; }
+      }
+      if (p.grow > 0) p.grow--; else p.body.pop();
+      if (t < p.boost) { const [x, y] = cpos(p.body[p.body.length - 1]); FX.p.push([x, y, 0, 0, 14, 14, p.color, 5]); }
+    });
+    drawScene(t); updateFx(); drawFx(); await present();
+    const dead = P.filter(p => !p.alive);
     if (dead.length) {
-      state.over = true;
-      if (dead.length === 2) state.winner = -1;
-      else {
-        state.winner = state.players[0].alive ? 0 : 1;
-        wins[state.winner]++;
-        root.querySelector('#s1').textContent = `Зелёный: ${wins[0]}`;
-        root.querySelector('#s2').textContent = `Синий: ${wins[1]}`;
-      }
+      dead.forEach(p => p.body.forEach(c => burst(...cpos(c), p.color, 2, 4, 50)));
+      FX.shake = 14; sfx('boom'); await finishAnim(drawScene, 50);
+      if (dead.length === 2) return endScreen('Ничья!', ['Обе змейки разбились']);
+      const w = P[0].alive ? 0 : 1; wins[w]++;
+      return endScreen(`Победил ${P[w].name}!`, [`Счёт: ${wins[0]} : ${wins[1]}`], P[w].color);
     }
   }
-
-  function draw() {
-    ctx.fillStyle = '#0f0e1a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // grid
-    ctx.strokeStyle = '#1a1830';
-    for (let x = 0; x <= COLS; x++) {
-      ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, ROWS * CELL); ctx.stroke();
-    }
-    for (let y = 0; y <= ROWS; y++) {
-      ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(COLS * CELL, y * CELL); ctx.stroke();
-    }
-    state.apples.forEach(([x, y]) => {
-      ctx.fillStyle = '#f87171';
-      ctx.beginPath();
-      ctx.arc(x * CELL + 10, y * CELL + 10, 8, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    state.players.forEach(p => {
-      p.body.forEach((b, i) => {
-        const k = 1 - i / Math.max(p.body.length, 1) * 0.5;
-        ctx.fillStyle = p.alive ? p.color : '#555';
-        ctx.globalAlpha = k;
-        ctx.fillRect(b[0] * CELL + 1, b[1] * CELL + 1, CELL - 2, CELL - 2);
-      });
-      ctx.globalAlpha = 1;
-    });
-    if (state.over) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ffd54a';
-      ctx.font = 'bold 36px Rubik';
-      ctx.textAlign = 'center';
-      const msg = state.winner < 0 ? 'Ничья!' : `Победил ${state.players[state.winner].name}!`;
-      ctx.fillText(msg, canvas.width / 2, canvas.height / 2 - 10);
-      ctx.font = '18px Rubik';
-      ctx.fillStyle = '#ccc';
-      ctx.fillText('R — ещё раунд', canvas.width / 2, canvas.height / 2 + 30);
-    }
-  }
-
-  function loop() {
-    if (!running) return;
-    step();
-    draw();
-    animId = requestAnimationFrame(loop);
-  }
-
-  function cleanup() {
-    running = false;
-    cancelAnimationFrame(animId);
-    window.removeEventListener('keydown', key);
-  }
-  window.__gameCleanup = cleanup;
-  window.addEventListener('keydown', key);
-  loop();
 }
+async function snake() { const wins = [0, 0]; while (await snakeRound(wins) === 'again'); }
