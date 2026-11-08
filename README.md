@@ -5,9 +5,11 @@
 **Большой сборник ретро- и неоновых аркадных игр на одном экране.**  
 Играйте в одиночку, вдвоём или компанией до 4 человек на одной клавиатуре прямо в браузере!
 
-[![Play Online](https://shields.io🎮_ИГРАТЬ_ОНЛАЙН-ARCADA.CFD-00e5ff?style=for-the-badge&labelColor=0d0d1a)](https://arcada.cfd)
-![Games](https://shields.ioИгр_в_сборнике-20-ff007f?style=for-the-badge&labelColor=0d0d1a)
-![Tech](https://shields.ioHTML5_Canvas-Vanilla_JS-f7df1e?style=for-the-badge&labelColor=0d0d1a)
+<h3>👉 <a href="https://arcada.cfd">ЗАПУСТИТЬ АРКАДУ ОНЛАЙН (ARCADA.CFD)</a> 👈</h3>
+
+![Status](https://shields.io)
+![Games](https://shields.io)
+![Tech](https://shields.io)
 
 </div>
 
