@@ -1,30 +1,50 @@
 'use strict';
 const GAMES = [
-  { n: 'Змейка', d: 'Классика, 2 игр.', c: [60, 220, 150], run: snake },
-  { n: 'Монеты', d: 'Сбор, 2-4 игр.', c: [255, 208, 84], run: coins },
   { n: 'Понг+', d: 'Ракетки, 2 игр.', c: [96, 214, 255], run: pong },
-  { n: 'Танки', d: 'Война, 2 игр.', c: [255, 140, 90], run: tanksGame },
   { n: 'Сумо', d: 'Арена, 2-4 игр.', c: [255, 107, 190], run: sumo },
   { n: 'Дуэль', d: 'На реакцию', c: [255, 96, 110], run: duel },
   { n: 'Виселица', d: 'Угадай слово', c: [170, 140, 255], run: hangmanLoop },
   { n: 'Wordle', d: 'Слова 5-6 букв', c: [110, 232, 190], run: wordle },
   { n: 'Гонка', d: 'Синтвейв раннер', c: [255, 60, 150], run: race },
   { n: 'Флаппи', d: 'Прыгающий куб', c: [255, 208, 84], run: flappy },
-  { n: 'Арканоид', d: 'Разбей блоки', c: [130, 200, 255], run: arkanoid },
-  { n: 'Космос', d: 'Отстрел', c: [200, 100, 255], run: shooter },
   { n: 'Пэкмен', d: 'Лабиринт', c: [255, 220, 0], run: pacman },
-  { n: 'Тетрис', d: 'Падающие блоки', c: [150, 255, 100], run: tetris },
-  { n: '2048', d: 'Слияние цифр', c: [250, 150, 50], run: game2048 },
-  { n: 'Астероиды', d: 'Космо-шутер', c: [0, 255, 255], run: asteroids },
-  { n: 'Мемори', d: 'Найди пары', c: [50, 255, 200], run: memoryGame },
   { n: 'Сапёр', d: 'Минное поле', c: [255, 80, 80], run: mines },
-  { n: 'Лягушка', d: 'Переход дороги', c: [50, 200, 50], run: frogger },
-  { n: 'Прыгун', d: 'Прыжки вверх', c: [150, 200, 255], run: doodle }
+  { n: 'Бильярд', d: '8-ball, 1-2 игр.', c: [96, 214, 150], run: billiards },
+  { n: 'Слоты', d: 'Демо, монеты', c: [255, 90, 160], run: slots },
+  { n: 'Морской бой', d: 'Флот, 2 игрока', c: [70, 180, 255], run: battleship },
+  { n: 'Крестики', d: '3×3 / 5×5, ИИ', c: [255, 200, 100], run: tictactoe }
 ];
+// Подбираем число колонок так, чтобы сетка была ровной (без одной «висящей» карточки)
+const COLS = (() => {
+  const n = GAMES.length;
+  if (n <= 6) return n;
+  if (n <= 8) return 4;
+  if (n <= 10) return 5;
+  if (n <= 12) return 4;
+  if (n <= 15) return 5; // 13 → 5+5+3
+  return 6;
+})();
 
 const rect = i => {
-    const c = i % 5, r = Math.floor(i / 5);
-    return [W/2 - 430 + c * 175, 150 + r * 110, 160, 95];
+    const N = GAMES.length;
+    const rows = Math.ceil(N / COLS);
+    const r = Math.floor(i / COLS);
+    const inRow = (r === rows - 1) ? (N - r * COLS) : COLS;
+    const c = i % COLS;
+
+    // Карточки чуть компактнее при 5 колонках, с равномерными отступами
+    const cardW = COLS >= 5 ? 168 : 190;
+    const cardH = COLS >= 5 ? 100 : 108;
+    const gapX = COLS >= 5 ? 16 : 20;
+    const gapY = 18;
+
+    const rowW = inRow * cardW + (inRow - 1) * gapX;
+    const x0 = W / 2 - rowW / 2;
+    const totalH = rows * cardH + (rows - 1) * gapY;
+    // Сетка по вертикали между заголовком (~130) и подсказками (~H-40)
+    const top = 140, bottom = H - 50;
+    const y0 = top + Math.max(0, (bottom - top - totalH) / 2);
+    return [x0 + c * (cardW + gapX), y0 + r * (cardH + gapY), cardW, cardH];
 };
 
 async function menu() {
@@ -42,10 +62,11 @@ async function menu() {
     applySize(); const t = now(), { keys, clicks } = pump();
     
     for (const e of keys) {
-      if (is(e, 'ArrowRight', 'KeyD')) { sel = (sel + 1) % 20; sfx('beep'); }
-      if (is(e, 'ArrowLeft', 'KeyA')) { sel = (sel + 19) % 20; sfx('beep'); }
-      if (is(e, 'ArrowDown', 'KeyS')) { sel = (sel + 5) % 20; sfx('beep'); }
-      if (is(e, 'ArrowUp', 'KeyW')) { sel = (sel + 15) % 20; sfx('beep'); }
+      const N = GAMES.length;
+      if (is(e, 'ArrowRight', 'KeyD')) { sel = (sel + 1) % N; sfx('beep'); }
+      if (is(e, 'ArrowLeft', 'KeyA')) { sel = (sel + N - 1) % N; sfx('beep'); }
+      if (is(e, 'ArrowDown', 'KeyS')) { sel = sel + COLS < N ? sel + COLS : sel % COLS; sfx('beep'); }
+      if (is(e, 'ArrowUp', 'KeyW')) { let n = sel - COLS; if (n < 0) { n = sel; while (n + COLS < N) n += COLS; } sel = n; sfx('beep'); }
       if (is(e, 'Enter', 'NumpadEnter', 'Space') && GAMES[sel].run) return GAMES[sel];
       if (is(e, 'KeyM')) STATE.mute = !STATE.mute;
     }
@@ -125,7 +146,7 @@ async function menu() {
     g.fillText(title, 0, 0);
     g.restore();
     
-    text('20 EXCLUSIVE GAMES • 2027 EDITION', cx, 120, { size: 14, color: [200, 255, 255], bold: true, spacing: 6, shadow: true });
+    text('13 EXCLUSIVE GAMES • 2027 EDITION', cx, 120, { size: 14, color: [200, 255, 255], bold: true, spacing: 6, shadow: true });
     
     // 5. КАРТОЧКИ ИГР: Неоновый контур, который бегает при наведении
     GAMES.forEach((gm, i) => {
@@ -158,13 +179,14 @@ async function menu() {
       g.restore();
       
       // Иконка / Номер
-      glow(mx, y + 30, on ? 50 : 20, dark(gm.c, off_s ? .1 : (on ? .8 : .4))); 
-      disc(mx, y + 30, 16, off_s ? GRAY : gm.c);
-      text(String(i + 1), mx, y + 31, { size: 16, bold: true, color: [10, 10, 15] });
+      const iy = y + Math.round(r_box[3] * 0.32);
+      glow(mx, iy, on ? 50 : 20, dark(gm.c, off_s ? .1 : (on ? .8 : .4)));
+      disc(mx, iy, 16, off_s ? GRAY : gm.c);
+      text(String(i + 1), mx, iy + 1, { size: 15, bold: true, color: [10, 10, 15] });
       
       // Текст
-      text(gm.n, mx, y + 65, { size: 18, bold: true, color: on ? WHITE : [180,180,190], shadow: on }); 
-      text(gm.d, mx, y + 82, { size: 12, color: on ? [220,255,255] : [100,110,130] });
+      text(gm.n, mx, y + Math.round(r_box[3] * 0.68), { size: 18, bold: true, color: on ? WHITE : [180,180,190], shadow: on });
+      text(gm.d, mx, y + Math.round(r_box[3] * 0.88), { size: 12, color: on ? [220,255,255] : [100,110,130] });
     });
     
     hints([['WASD / Стрелки', 'Навигация'], ['Enter / ЛКМ', 'Играть'], ['M', STATE.mute ? 'Вкл звук' : 'Выкл звук'], ['F11', 'На весь экран']], H - 25);

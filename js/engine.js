@@ -16,7 +16,19 @@ function applySize() {
   const asp = Math.max(1.5, Math.min(2.4, innerWidth / innerHeight)), Wn = asp > 1.5 ? Math.round(H * asp) : 960;
   if (Wn !== W) { W = Wn; fit(); }
 }
-applySize(); fit(); addEventListener('resize', fit); document.addEventListener('fullscreenchange', fit);
+applySize(); fit();
+// При ресайзе и F11 всегда подгоняем логическую ширину W под пропорции экрана —
+// иначе внутри игр остаются чёрные полосы (меню вызывало applySize каждый кадр, игры — нет)
+function onViewportChange() {
+  applySize();
+  fit();
+  // в полноэкране убираем скругления/тени у canvas
+  const fs = !!document.fullscreenElement;
+  document.documentElement.classList.toggle('is-fullscreen', fs);
+  document.body.classList.toggle('is-fullscreen', fs);
+}
+addEventListener('resize', onViewportChange);
+document.addEventListener('fullscreenchange', onViewportChange);
 const toggleFull = () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (_) { } };
 cv.addEventListener('dblclick', toggleFull);
 const FF = '"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif';
@@ -34,7 +46,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const now = () => performance.now();
 
 // ----- ввод -----
-const held = new Set(), keyQ = [], clickQ = [], mouse = { x: -1, y: -1 };
+const held = new Set(), keyQ = [], clickQ = [], mouse = { x: -1, y: -1, down: false, up: false };
 const pos = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
 addEventListener('keydown', e => {
   if (e.code === 'F11') { e.preventDefault(); toggleFull(); return; }
@@ -44,8 +56,10 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => held.delete(e.code));
 addEventListener('blur', () => held.clear());
-cv.addEventListener('pointerdown', e => { clickQ.push(pos(e)); });
+cv.addEventListener('pointerdown', e => { const p = pos(e); Object.assign(mouse, p, { down: true }); clickQ.push(p); });
 cv.addEventListener('pointermove', e => Object.assign(mouse, pos(e)));
+addEventListener('pointerup', () => { mouse.down = false; mouse.up = true; });
+addEventListener('pointercancel', () => { mouse.down = false; mouse.up = true; });
 const pump = () => ({ keys: keyQ.splice(0), clicks: clickQ.splice(0) });
 const is = (e, ...codes) => codes.includes(e.code);
 const inRect = (p, r) => p.x >= r[0] && p.x <= r[0] + r[2] && p.y >= r[1] && p.y <= r[1] + r[3];
